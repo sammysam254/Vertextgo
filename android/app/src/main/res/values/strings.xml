@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vertex Go</string>
+    <string name="device_admin_label">Vertex Go Device Manager</string>
+    <string name="device_admin_description">Required to manage this financed device. Allows Vertex Go to lock this device if payment is not received on time, per your loan agreement.</string>
+</resources>

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#060B14"
+    android:padding="32dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🔒"
+        android:textSize="72sp"
+        android:gravity="center"
+        android:paddingBottom="24dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="DEVICE LOCKED"
+        android:textColor="#FF3355"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.2"
+        android:gravity="center"
+        android:paddingBottom="8dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Payment Required"
+        android:textColor="#7A9BB5"
+        android:textSize="15sp"
+        android:gravity="center"
+        android:paddingBottom="40dp" />
+
+    <!-- Divider -->
+    <View
+        android:layout_width="60dp"
+        android:layout_height="2dp"
+        android:background="#1E3A52"
+        android:layout_marginBottom="40dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/card_background"
+        android:padding="24dp"
+        android:layout_marginBottom="32dp">
+
+        <TextView
+            android:id="@+id/tvLockedCustomerName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Customer"
+            android:textColor="#E8F4FD"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvLockedAccount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Account: —"
+            android:textColor="#00D4FF"
+            android:textSize="13sp"
+            android:paddingBottom="20dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="MINIMUM PAYMENT DUE"
+            android:textColor="#3D5872"
+            android:textSize="10sp"
+            android:letterSpacing="0.15"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvLockedAmount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="K—/day required"
+            android:textColor="#FF8C00"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Contact your Vertex Go agent to make a payment and unlock this device."
+        android:textColor="#7A9BB5"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:lineSpacingMultiplier="1.4" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="VERTEX GO © Device Finance"
+        android:textColor="#3D5872"
+        android:textSize="11sp"
+        android:gravity="center"
+        android:paddingBottom="16dp" />
+
+</LinearLayout>

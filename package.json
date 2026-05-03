@@ -1,0 +1,16 @@
+{
+  "name": "vertexgo-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd web && npm install && npm run build",
+    "start": "sh render_inject_env.sh",
+    "install-web": "cd web && npm install"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

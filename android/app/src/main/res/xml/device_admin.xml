@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  device_admin.xml
+  Declares which DevicePolicyManager policies this app can use.
+  As Device Owner (enrolled via QR/NFC DPC), ALL policies are available.
+  This file is referenced in AndroidManifest by the DeviceAdminReceiver.
+-->
+<device-admin>
+    <uses-policies>
+        <!-- Lock the screen immediately -->
+        <force-lock />
+
+        <!-- Set and reset the PIN/password -->
+        <reset-password />
+
+        <!-- Wipe the device remotely -->
+        <wipe-data />
+
+        <!-- Set maximum failed password attempts -->
+        <limit-password />
+
+        <!-- Watch login attempts -->
+        <watch-login />
+
+        <!-- Expire the password -->
+        <expire-password />
+
+        <!-- Encrypt storage -->
+        <encrypted-storage />
+
+        <!-- Disable camera -->
+        <disable-camera />
+
+        <!-- Disable keyguard features -->
+        <disable-keyguard-features />
+    </uses-policies>
+</device-admin>

@@ -1,0 +1,50 @@
+# render.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+# Render Blueprint — defines the Vertex Go web service.
+# Deploy at: https://render.com/deploy
+#
+# REQUIRED Environment Variables (set in Render dashboard):
+#   SUPABASE_URL          → Your Supabase project URL
+#   SUPABASE_ANON_KEY     → Your Supabase anon/public key
+#
+# For Android APK builds, set these SAME keys as GitHub Secrets:
+#   SUPABASE_URL          → same value
+#   SUPABASE_ANON_KEY     → same value
+#   KEYSTORE_BASE64       → base64 encoded .jks signing keystore
+#   KEY_ALIAS             → vertexgo
+#   KEY_PASSWORD          → your key password
+#   STORE_PASSWORD        → your keystore password
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: vertexgo-web
+    runtime: node
+    region: oregon
+    plan: free
+
+    # Build: install deps + build React
+    buildCommand: npm install && npm run build
+
+    # Start: inject Render env vars into built HTML, then serve
+    startCommand: npm start
+
+    # Auto-deploy every time you push to main
+    autoDeploy: true
+
+    # Render reads these from your service Environment settings
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false          # You set this manually in Render dashboard
+      - key: SUPABASE_ANON_KEY
+        sync: false          # You set this manually in Render dashboard
+      - key: PORT
+        value: 3000
+
+    # SPA routing — all paths serve index.html
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

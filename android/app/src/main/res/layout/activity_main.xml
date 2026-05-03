@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#060B14"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <!-- LOGO HEADER -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="VERTEX GO"
+            android:textColor="#00D4FF"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.2"
+            android:gravity="center"
+            android:paddingTop="32dp"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="DEVICE FINANCE PLATFORM"
+            android:textColor="#3D5872"
+            android:textSize="11sp"
+            android:letterSpacing="0.25"
+            android:gravity="center"
+            android:paddingBottom="40dp" />
+
+        <!-- ══ LOGIN LAYOUT ═══════════════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/loginLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_background"
+            android:padding="24dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CUSTOMER LOGIN"
+                android:textColor="#7A9BB5"
+                android:textSize="11sp"
+                android:letterSpacing="0.2"
+                android:paddingBottom="20dp" />
+
+            <TextView
+                android:id="@+id/tvEnrollmentStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#00FF88"
+                android:textSize="13sp"
+                android:padding="12dp"
+                android:background="#1A00FF88"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ACCOUNT NUMBER (National ID)"
+                android:textColor="#7A9BB5"
+                android:textSize="10sp"
+                android:letterSpacing="0.15"
+                android:paddingBottom="6dp" />
+
+            <EditText
+                android:id="@+id/etAccountNumber"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:background="@drawable/input_background"
+                android:hint="e.g. 123456/78/9"
+                android:hintTextColor="#3D5872"
+                android:textColor="#E8F4FD"
+                android:textSize="15sp"
+                android:padding="12dp"
+                android:inputType="text"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/tvLoginError"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#FF3355"
+                android:textSize="13sp"
+                android:padding="10dp"
+                android:background="#1AFF3355"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp" />
+
+            <Button
+                android:id="@+id/btnLogin"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:text="LOGIN"
+                android:textColor="#060B14"
+                android:textSize="15sp"
+                android:letterSpacing="0.15"
+                android:backgroundTint="#00D4FF"
+                android:layout_marginTop="8dp" />
+
+        </LinearLayout>
+
+        <!-- ══ DASHBOARD LAYOUT ═══════════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/dashboardLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <!-- Customer Info Card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/card_background"
+                android:padding="20dp"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvCustomerName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Customer Name"
+                            android:textColor="#E8F4FD"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvAccountNumber"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Account: —"
+                            android:textColor="#00D4FF"
+                            android:textSize="12sp"
+                            android:paddingTop="4dp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvDeviceStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🔓 ACTIVE"
+                        android:textColor="#00FF88"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:padding="8dp"
+                        android:background="#1A00FF88" />
+                </LinearLayout>
+
+                <ProgressBar
+                    android:id="@+id/loadingIndicator"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"
+                    android:indeterminate="true"
+                    android:progressTint="#00D4FF"
+                    android:visibility="gone"
+                    android:layout_marginTop="12dp" />
+            </LinearLayout>
+
+            <!-- Warning Banner -->
+            <TextView
+                android:id="@+id/tvWarning"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#FF8099"
+                android:textSize="13sp"
+                android:padding="14dp"
+                android:background="#1AFF3355"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Loan Details Card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/card_background"
+                android:padding="20dp"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="LOAN DETAILS"
+                    android:textColor="#7A9BB5"
+                    android:textSize="10sp"
+                    android:letterSpacing="0.2"
+                    android:paddingBottom="16dp" />
+
+                <!-- Grid of stats -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="12dp">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:background="@drawable/stat_background" android:padding="12dp" android:layout_marginEnd="8dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="DAILY RATE" android:textColor="#3D5872" android:textSize="9sp" android:letterSpacing="0.1" />
+                        <TextView android:id="@+id/tvDailyRate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K—/day" android:textColor="#00D4FF" android:textSize="16sp" android:textStyle="bold" android:paddingTop="4dp" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:background="@drawable/stat_background" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="TOTAL PRICE" android:textColor="#3D5872" android:textSize="9sp" android:letterSpacing="0.1" />
+                        <TextView android:id="@+id/tvTotalPrice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K—" android:textColor="#E8F4FD" android:textSize="16sp" android:textStyle="bold" android:paddingTop="4dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="12dp">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:background="@drawable/stat_background" android:padding="12dp" android:layout_marginEnd="8dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="AMOUNT PAID" android:textColor="#3D5872" android:textSize="9sp" android:letterSpacing="0.1" />
+                        <TextView android:id="@+id/tvAmountPaid" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K—" android:textColor="#00FF88" android:textSize="16sp" android:textStyle="bold" android:paddingTop="4dp" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:background="@drawable/stat_background" android:padding="12dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="BALANCE DUE" android:textColor="#3D5872" android:textSize="9sp" android:letterSpacing="0.1" />
+                        <TextView android:id="@+id/tvBalanceDue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K—" android:textColor="#FF8C00" android:textSize="16sp" android:textStyle="bold" android:paddingTop="4dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Progress bar -->
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PAYMENT PROGRESS" android:textColor="#3D5872" android:textSize="9sp" android:letterSpacing="0.1" android:paddingBottom="6dp" />
+
+                <ProgressBar
+                    android:id="@+id/progressLoan"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="8dp"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressTint="#00D4FF"
+                    android:progressBackgroundTint="#1E3A52" />
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp">
+                    <TextView android:id="@+id/tvProgress" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="0% paid" android:textColor="#7A9BB5" android:textSize="11sp" />
+                    <TextView android:id="@+id/tvDaysLeft" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="— days left" android:textColor="#7A9BB5" android:textSize="11sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Next Due Card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="@drawable/card_background"
+                android:padding="20dp"
+                android:layout_marginBottom="24dp">
+
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="NEXT PAYMENT DUE" android:textColor="#3D5872" android:textSize="9sp" android:letterSpacing="0.1" android:paddingBottom="4dp" />
+                    <TextView android:id="@+id/tvNextDue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="—" android:textColor="#E8F4FD" android:textSize="15sp" android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="MIN. AMOUNT" android:textColor="#3D5872" android:textSize="9sp" android:letterSpacing="0.1" android:paddingBottom="4dp" />
+                    <TextView android:id="@+id/tvMinAmount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="K—" android:textColor="#00D4FF" android:textSize="18sp" android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Sign out -->
+            <Button
+                android:id="@+id/btnSignOut"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="SIGN OUT"
+                android:textColor="#7A9BB5"
+                android:textSize="13sp"
+                android:backgroundTint="#0D1526"
+                android:layout_marginBottom="32dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
