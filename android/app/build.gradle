@@ -7,6 +7,15 @@ android {
     namespace 'com.vertexgo.app'
     compileSdk 34
 
+    signingConfigs {
+        release {
+            storeFile file("vertexgo-release.jks")
+            storePassword "vertexgo2024"
+            keyAlias "vertexgo"
+            keyPassword "vertexgo2024"
+        }
+    }
+
     defaultConfig {
         applicationId "com.vertexgo.app"
         minSdk 26
@@ -21,11 +30,17 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
         release {
+            signingConfig signingConfigs.release
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -35,7 +50,7 @@ android {
     }
     buildFeatures {
         buildConfig true
-        viewBinding true
+        viewBinding false
     }
 }
 
@@ -45,18 +60,11 @@ dependencies {
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.work:work-runtime-ktx:2.9.0'
-
-    // Networking
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.google.code.gson:gson:2.10.1'
-
-    // Coroutines
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
-
-    // Lifecycle
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
-
-    // Security (encrypted prefs)
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+    implementation 'androidx.activity:activity-ktx:1.8.2'
 }
