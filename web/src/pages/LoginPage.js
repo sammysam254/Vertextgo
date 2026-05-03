@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signIn } from '../lib/supabase';
-import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -9,30 +8,63 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { profile } = useAuth();
-
-  if (profile) {
-    navigate(profile.role === 'super_admin' ? '/super-admin' : '/admin');
-  }
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true); setError('');
-    const { error: err } = await signIn(email, password);
-    if (err) { setError(err.message); setLoading(false); return; }
-    // navigation happens via auth state change
+    setLoading(true);
+    setError('');
+
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (signInError) {
+        setError(signInError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data?.user) {
+        // Fetch profile to determine role
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError || !profile) {
+          setError('Profile not found. Contact administrator.');
+          setLoading(false);
+          return;
+        }
+
+        if (!profile.is_active) {
+          setError('Your account has been deactivated.');
+          setLoading(false);
+          return;
+        }
+
+        // Route based on role
+        if (profile.role === 'super_admin') {
+          navigate('/super-admin');
+        } else {
+          navigate('/admin');
+        }
+      }
+    } catch (err) {
+      setError('Connection error. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
       <div className="vx-grid-bg" />
-
-      {/* Glow orbs */}
       <div style={{ position: 'absolute', top: '-200px', left: '-200px', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(0,102,255,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: '-200px', right: '-200px', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '420px', padding: '0 1rem' }}>
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', fontWeight: 700, color: 'var(--accent-cyan)', letterSpacing: '6px', lineHeight: 1, textShadow: 'var(--glow-cyan)' }}>
             VERTEX
@@ -46,7 +78,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Card */}
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-bright)', borderRadius: '12px', padding: '2.5rem', boxShadow: 'var(--glow-cyan), 0 40px 80px rgba(0,0,0,0.4)' }}>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 600, letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
             STAFF LOGIN
@@ -61,15 +92,34 @@ export default function LoginPage() {
           <form onSubmit={handleLogin}>
             <div className="vx-form-group">
               <label className="vx-label">Email Address</label>
-              <input className="vx-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@vertexgo.com" required />
+              <input
+                className="vx-input"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="admin@vertexgo.com"
+                required
+              />
             </div>
             <div className="vx-form-group" style={{ marginBottom: '1.5rem' }}>
               <label className="vx-label">Password</label>
-              <input className="vx-input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+              <input
+                className="vx-input"
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
             </div>
 
-            <button className="vx-btn vx-btn-primary" type="submit" disabled={loading} style={{ width: '100%', justifyContent: 'center', padding: '0.8rem', fontSize: '1rem', letterSpacing: '2px' }}>
-              {loading ? <><span className="vx-spinner" style={{ width: 18, height: 18, borderWidth: 2 }} /> SIGNING IN...</> : 'SIGN IN →'}
+            <button
+              className="vx-btn vx-btn-primary"
+              type="submit"
+              disabled={loading}
+              style={{ width: '100%', justifyContent: 'center', padding: '0.8rem', fontSize: '1rem', letterSpacing: '2px' }}
+            >
+              {loading ? 'SIGNING IN...' : 'SIGN IN →'}
             </button>
           </form>
 
