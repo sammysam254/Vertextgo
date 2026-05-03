@@ -2,228 +2,126 @@ name: Vertex Go CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
-  pull_request:
     branches: [ main ]
-  workflow_dispatch:       # Allow manual trigger from GitHub UI or Termux
+  workflow_dispatch:
 
-# ─── Permissions ──────────────────────────────────────────────────────────────
 permissions:
-  contents: write          # Needed to upload release assets
-  actions: read
-
-# NOTE ON SECRETS:
-# SUPABASE_URL and SUPABASE_ANON_KEY are set as Environment Variables
-# in your Render service dashboard (not GitHub Secrets).
-# For the Android APK build here on GitHub Actions, we read them from
-# GitHub Secrets (which you copy from Render). The web app running on
-# Render reads them directly from Render's environment at runtime.
+  contents: write
 
 jobs:
 
-  # ══════════════════════════════════════════════════════════════════════════════
-  # JOB 1: Build Android APK
-  # ══════════════════════════════════════════════════════════════════════════════
   build-android:
     name: Build Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     steps:
-      # 1. Checkout code
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # 2. Set up JDK 17 (required for AGP 8.x)
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
 
-      # 3. Cache Gradle dependencies (speeds up Termux pushes massively)
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-            android/.gradle
-          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
+          gradle-version: "8.4"
 
-      # 4. Inject secrets into BuildConfig
       - name: Inject Supabase credentials
-        working-directory: android
         run: |
-          sed -i 's|"YOUR_SUPABASE_URL"|"${{ secrets.SUPABASE_URL }}"|g' app/build.gradle
-          sed -i 's|"YOUR_SUPABASE_ANON_KEY"|"${{ secrets.SUPABASE_ANON_KEY }}"|g' app/build.gradle
+          sed -i "s@\"YOUR_SUPABASE_URL\"@\"${{ secrets.SUPABASE_URL }}\"@g" android/app/build.gradle
+          sed -i "s@\"YOUR_SUPABASE_ANON_KEY\"@\"${{ secrets.SUPABASE_ANON_KEY }}\"@g" android/app/build.gradle
 
-      # 5. Grant execute permission for gradlew
       - name: Make gradlew executable
-        working-directory: android
-        run: chmod +x gradlew
+        run: chmod +x android/gradlew
 
-      # 6. Build DEBUG APK (unsigned — for testing/sideload during development)
       - name: Build Debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx2048m"
 
-      # 7. Build RELEASE APK (signed if keystore secrets present)
       - name: Build Release APK
         working-directory: android
-        env:
-          KEYSTORE_FILE:      ${{ secrets.KEYSTORE_BASE64 }}
-          KEY_ALIAS:          ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD:       ${{ secrets.KEY_PASSWORD }}
-          STORE_PASSWORD:     ${{ secrets.STORE_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_FILE" ]; then
-            echo "Signing release APK with keystore..."
-            echo "$KEYSTORE_FILE" | base64 --decode > vertexgo.keystore
-            ./gradlew assembleRelease \
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > vertexgo.keystore
+            gradle assembleRelease \
               -Pandroid.injected.signing.store.file=$(pwd)/vertexgo.keystore \
-              -Pandroid.injected.signing.store.password="$STORE_PASSWORD" \
-              -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-              -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
+              -Pandroid.injected.signing.store.password="${{ secrets.STORE_PASSWORD }}" \
+              -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+              -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}" \
               --no-daemon
           else
-            echo "No keystore — building unsigned release APK..."
-            ./gradlew assembleRelease --no-daemon
+            gradle assembleRelease --no-daemon
           fi
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx2048m"
 
-      # 8. Rename APKs with version + timestamp
-      - name: Rename APK artifacts
+      - name: Collect APKs
         run: |
-          TIMESTAMP=$(date +%Y%m%d_%H%M)
-          VERSION=$(grep versionName android/app/build.gradle | grep -o '"[^"]*"' | tr -d '"')
           mkdir -p artifacts
-          cp android/app/build/outputs/apk/debug/app-debug.apk   "artifacts/VertexGo_v${VERSION}_debug_${TIMESTAMP}.apk"
-          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
-            cp android/app/build/outputs/apk/release/app-release.apk  "artifacts/VertexGo_v${VERSION}_release_${TIMESTAMP}.apk"
-          elif [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
-            cp android/app/build/outputs/apk/release/app-release-unsigned.apk "artifacts/VertexGo_v${VERSION}_release-unsigned_${TIMESTAMP}.apk"
-          fi
+          TIMESTAMP=$(date +%Y%m%d_%H%M)
+          VERSION=$(grep 'versionName' android/app/build.gradle | grep -o '"[^"]*"' | tr -d '"')
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+          find android/app/build/outputs/apk -name "*.apk" -exec cp {} artifacts/ \; 2>/dev/null || true
+          ls -lh artifacts/ || echo "No APKs found"
 
-      # 9. Upload APKs as workflow artifacts (downloadable from GitHub UI)
-      - name: Upload APK artifacts
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: vertexgo-apk-${{ env.TIMESTAMP }}
+          name: VertexGo-APKs-${{ env.TIMESTAMP }}
           path: artifacts/*.apk
           retention-days: 30
 
-      # 10. Create GitHub Release on main branch push
-      - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      - name: Create Release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}-${{ env.TIMESTAMP }}
-          name: "Vertex Go v${{ env.VERSION }} (${{ env.TIMESTAMP }})"
-          body: |
-            ## Vertex Go Android App
-
-            ### What's included
-            - 📱 **Debug APK** — For testing, sideload directly
-            - 📦 **Release APK** — For production deployment
-
-            ### Installation (Device Owner Enrollment)
-            1. Factory reset the target device
-            2. Tap screen **6 times** on the Welcome screen to trigger DPC mode
-            3. Scan the enrollment QR code generated in the Admin dashboard
-            4. The APK installs automatically as Device Owner
-            5. Log in with the customer's account number (National ID)
-
-            ### Enrollment QR Payload
-            Generate the QR in the Admin Dashboard → Link Device → Step 3
-
-            ---
-            Built from commit `${{ github.sha }}` by `${{ github.actor }}`
+          name: "Vertex Go v${{ env.VERSION }}"
+          body: "Built from commit ${{ github.sha }}"
           files: artifacts/*.apk
-          draft: false
-          prerelease: ${{ github.ref != 'refs/heads/main' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ══════════════════════════════════════════════════════════════════════════════
-  # JOB 2: Build & Deploy Web Dashboard
-  # ══════════════════════════════════════════════════════════════════════════════
-  deploy-web:
-    name: Build & Deploy Web Dashboard
+  build-web:
+    name: Build Web Dashboard
     runs-on: ubuntu-latest
-    timeout-minutes: 15
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: web/package.json
 
       - name: Install dependencies
         working-directory: web
-        run: npm ci
+        run: npm install
 
-      # Inject env vars into the React build
-      - name: Create .env file
-        working-directory: web
-        run: |
-          echo "REACT_APP_SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env.production
-          echo "REACT_APP_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env.production
-
-      - name: Build React app
+      - name: Build
         working-directory: web
         run: npm run build
         env:
-          CI: false       # Prevents treating warnings as errors
+          CI: false
+          REACT_APP_SUPABASE_URL: "RENDER_SUPABASE_URL_PLACEHOLDER"
+          REACT_APP_SUPABASE_ANON_KEY: "RENDER_SUPABASE_ANON_KEY_PLACEHOLDER"
 
-      # Upload web build as artifact (Netlify/Render can pull this)
       - name: Upload web build
         uses: actions/upload-artifact@v4
         with:
-          name: vertexgo-web-build
+          name: vertexgo-web
           path: web/build/
           retention-days: 7
 
-      # ── Trigger Render deploy via deploy hook ──────────────────────────────
-      # Render auto-deploys from GitHub when connected. This is just a
-      # manual trigger for the Render web service deploy hook (optional).
-      - name: Trigger Render Deploy
+      - name: Trigger Render deploy
         if: github.ref == 'refs/heads/main'
         run: |
           if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
             curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-            echo "Render deploy triggered"
           else
-            echo "No Render deploy hook set — Render will auto-deploy from GitHub push"
+            echo "Render auto-deploys from push — no hook needed"
           fi
-
-  # ══════════════════════════════════════════════════════════════════════════════
-  # JOB 3: Notify on completion
-  # ══════════════════════════════════════════════════════════════════════════════
-  notify:
-    name: Build Summary
-    runs-on: ubuntu-latest
-    needs: [ build-android, deploy-web ]
-    if: always()
-
-    steps:
-      - name: Build Summary
-        run: |
-          echo "## ✅ Vertex Go Build Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Android APK | ${{ needs.build-android.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Web Dashboard | ${{ needs.deploy-web.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Triggered by:** ${{ github.actor }} on branch \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
