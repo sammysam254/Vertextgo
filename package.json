@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "build": "cd web && npm install && npm run build",
-    "start": "sh render_inject_env.sh",
-    "install-web": "cd web && npm install"
+    "start": "sh render_inject_env.sh"
   },
   "dependencies": {
     "serve": "^14.2.1"
