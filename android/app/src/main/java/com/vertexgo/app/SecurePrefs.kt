@@ -5,25 +5,18 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
-/**
- * SecurePrefs — Encrypted SharedPreferences wrapper.
- * Stores device ID, customer account, enrollment state etc.
- * Data persists across app restarts and survives as long as
- * the Device Owner profile exists (survives user factory reset
- * when enrolled as Device Owner via DPC/QR).
- */
 class SecurePrefs private constructor(private val prefs: SharedPreferences) {
 
     companion object {
         private const val FILE_NAME = "vertexgo_secure"
-        private const val KEY_DEVICE_ID       = "device_id"
-        private const val KEY_CUSTOMER_ID     = "customer_id"
-        private const val KEY_ACCOUNT_NUMBER  = "account_number"
-        private const val KEY_CUSTOMER_NAME   = "customer_name"
-        private const val KEY_IS_ENROLLED     = "is_enrolled"
-        private const val KEY_IS_LOCKED       = "is_locked"
-        private const val KEY_DAILY_RATE      = "daily_rate"
-        private const val KEY_TOKEN_ID        = "token_id"
+        private const val KEY_DEVICE_ID      = "device_id"
+        private const val KEY_CUSTOMER_ID    = "customer_id"
+        private const val KEY_ACCOUNT_NUMBER = "account_number"
+        private const val KEY_CUSTOMER_NAME  = "customer_name"
+        private const val KEY_IS_ENROLLED    = "is_enrolled"
+        private const val KEY_IS_LOCKED      = "is_locked"
+        private const val KEY_DAILY_RATE     = "daily_rate"
+        private const val KEY_TOKEN_ID       = "token_id"
 
         @Volatile private var INSTANCE: SecurePrefs? = null
 
@@ -44,16 +37,15 @@ class SecurePrefs private constructor(private val prefs: SharedPreferences) {
         }
     }
 
-    // ─── Device ───────────────────────────────────────────────────────────────
+    // ── Device ────────────────────────────────────────────────────────────────
     var deviceId: String?
         get() = prefs.getString(KEY_DEVICE_ID, null)
         set(v) = prefs.edit().putString(KEY_DEVICE_ID, v).apply()
 
+    // FIX: removed duplicate setEnrolled() — var setter already generates it
     var isEnrolled: Boolean
         get() = prefs.getBoolean(KEY_IS_ENROLLED, false)
         set(v) = prefs.edit().putBoolean(KEY_IS_ENROLLED, v).apply()
-
-    fun setEnrolled(v: Boolean) { isEnrolled = v }
 
     var isLocked: Boolean
         get() = prefs.getBoolean(KEY_IS_LOCKED, false)
@@ -67,7 +59,7 @@ class SecurePrefs private constructor(private val prefs: SharedPreferences) {
         get() = prefs.getString(KEY_TOKEN_ID, null)
         set(v) = prefs.edit().putString(KEY_TOKEN_ID, v).apply()
 
-    // ─── Customer ─────────────────────────────────────────────────────────────
+    // ── Customer ──────────────────────────────────────────────────────────────
     var customerId: String?
         get() = prefs.getString(KEY_CUSTOMER_ID, null)
         set(v) = prefs.edit().putString(KEY_CUSTOMER_ID, v).apply()

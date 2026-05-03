@@ -59,7 +59,7 @@ class VertexGoDeviceAdminReceiver : DeviceAdminReceiver() {
 
         // Mark device as enrolled and start the main activity for customer login
         val prefs = SecurePrefs.get(context)
-        prefs.setEnrolled(true)
+        prefs.isEnrolled = true
 
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
