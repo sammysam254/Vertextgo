@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../hooks/useAuth';
-import { supabase, getUsers, updateUserRole, deactivateUser, activateUser, getDashboardStats, getLoans, getCustomers, getDevices } from '../lib/supabase';
+import { supabase, getUsers, updateUserRole, deactivateUser, activateUser, getDashboardStats, getLoans, getCustomers } from '../lib/supabase';
 
 const SIDEBAR_ITEMS = [
   { id: 'overview', label: 'System Overview', icon: '◈' },
   { section: 'USER MANAGEMENT' },
-  { id: 'users', label: 'All Users', icon: '◉' },
+  { id: 'users', label: 'All Staff', icon: '◉' },
   { id: 'create-user', label: 'Create User', icon: '⊕' },
   { section: 'DATA' },
   { id: 'all-loans', label: 'All Loans', icon: '◑' },
@@ -26,16 +26,22 @@ export default function SuperAdminDashboard() {
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), 4000);
   };
 
   const refresh = async () => {
     setLoading(true);
-    const [u, s, l, c] = await Promise.all([getUsers(), getDashboardStats(), getLoans(), getCustomers()]);
-    setUsers(u.data || []);
-    setStats(s);
-    setLoans(l.data || []);
-    setCustomers(c.data || []);
+    try {
+      const [u, s, l, c] = await Promise.all([
+        getUsers(), getDashboardStats(), getLoans(), getCustomers()
+      ]);
+      setUsers(u.data || []);
+      setStats(s);
+      setLoans(l.data || []);
+      setCustomers(c.data || []);
+    } catch (e) {
+      showToast('Failed to load data', 'error');
+    }
     setLoading(false);
   };
 
@@ -54,9 +60,7 @@ export default function SuperAdminDashboard() {
     <div className="vx-layout">
       <div className="vx-grid-bg" />
       <Sidebar items={SIDEBAR_ITEMS} activeItem={active} onSelect={setActive} role="super_admin" />
-
       <main className="vx-main" style={{ position: 'relative', zIndex: 1 }}>
-        {/* Super admin header strip */}
         <div style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 6, padding: '0.5rem 1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8rem' }}>
           <span style={{ color: '#a78bfa', fontWeight: 700, letterSpacing: 2 }}>⬡ SUPER ADMIN</span>
           <span style={{ color: 'var(--text-muted)' }}>Full system access · {profile?.full_name}</span>
@@ -69,7 +73,6 @@ export default function SuperAdminDashboard() {
           <div className="fade-in">{pages[active]}</div>
         )}
       </main>
-
       {toast && (
         <div style={{
           position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 9999,
@@ -86,26 +89,23 @@ export default function SuperAdminDashboard() {
   );
 }
 
-// ─── System Overview ──────────────────────────────────────────────────────────
+// ── System Overview ───────────────────────────────────────────────────────────
 function SystemOverview({ stats, users, loans }) {
   const totalRevenue = loans.reduce((s, l) => s + Number(l.total_paid || 0), 0);
   const completedLoans = loans.filter(l => l.status === 'completed').length;
-  const superAdmins = users.filter(u => u.role === 'super_admin').length;
-  const enrollers = users.filter(u => u.role === 'enroller').length;
 
   return (
     <div>
       <div className="vx-topbar">
         <h1 className="vx-page-title" style={{ color: '#a78bfa' }}>System Overview</h1>
       </div>
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         {[
           { label: 'Total Customers', value: stats.totalCustomers || 0, cls: '' },
           { label: 'Active Loans', value: stats.activeLoans || 0, cls: 'green' },
           { label: 'Completed Loans', value: completedLoans, cls: 'purple' },
           { label: 'Overdue Today', value: stats.overdueLoans || 0, cls: 'red' },
-          { label: 'Total Revenue', value: `K${totalRevenue.toFixed(0)}`, cls: 'orange' },
+          { label: 'Monthly Revenue', value: `K${(stats.monthlyRevenue || 0).toFixed(0)}`, cls: 'orange' },
           { label: 'Staff Users', value: users.length, cls: '' },
         ].map((s, i) => (
           <div className={`vx-stat ${s.cls}`} key={i}>
@@ -118,14 +118,15 @@ function SystemOverview({ stats, users, loans }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
         <div className="vx-card">
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.9rem', fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-            User Breakdown
+            Staff Breakdown
           </div>
           {[
-            { label: 'Super Admins', count: superAdmins, color: '#a78bfa' },
+            { label: 'Super Admins', count: users.filter(u => u.role === 'super_admin').length, color: '#a78bfa' },
             { label: 'Admins', count: users.filter(u => u.role === 'admin').length, color: 'var(--accent-cyan)' },
-            { label: 'Enrollers', count: enrollers, color: 'var(--accent-green)' },
+            { label: 'Enrollers', count: users.filter(u => u.role === 'enroller').length, color: 'var(--accent-green)' },
+            { label: 'Deactivated', count: users.filter(u => !u.is_active).length, color: 'var(--accent-red)' },
           ].map(r => (
-            <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
+            <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem 0', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
               <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{r.label}</span>
               <span style={{ color: r.color, fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{r.count}</span>
             </div>
@@ -134,12 +135,12 @@ function SystemOverview({ stats, users, loans }) {
 
         <div className="vx-card">
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.9rem', fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-            Recent Staff Activity
+            Recent Staff
           </div>
-          {users.slice(0, 5).map(u => (
+          {users.slice(0, 6).map(u => (
             <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{u.full_name}</div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: u.is_active ? 'var(--text-primary)' : 'var(--text-muted)' }}>{u.full_name}</div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{u.email}</div>
               </div>
               <span className={`vx-badge ${u.role === 'super_admin' ? 'vx-badge-purple' : u.role === 'admin' ? 'vx-badge-info' : 'vx-badge-success'}`}>
@@ -153,33 +154,241 @@ function SystemOverview({ stats, users, loans }) {
   );
 }
 
-// ─── User Management ──────────────────────────────────────────────────────────
-function UserManagement({ users, profile, refresh, showToast }) {
-  const [confirmAction, setConfirmAction] = useState(null);
+// ── Create User ───────────────────────────────────────────────────────────────
+function CreateUser({ refresh, showToast, profile, setActive }) {
+  const [form, setForm] = useState({ full_name: '', email: '', password: '', role: 'admin' });
+  const [loading, setLoading] = useState(false);
+  const [serviceKey, setServiceKey] = useState(localStorage.getItem('vx_service_key') || '');
+  const [showKeyInput, setShowKeyInput] = useState(!localStorage.getItem('vx_service_key'));
 
-  const handleRoleChange = async (userId, newRole) => {
-    if (userId === profile.id) { showToast("Cannot change your own role", 'error'); return; }
-    const { error } = await updateUserRole(userId, newRole);
-    if (error) showToast(error.message, 'error');
-    else { showToast('Role updated'); refresh(); }
+  const saveServiceKey = () => {
+    localStorage.setItem('vx_service_key', serviceKey);
+    setShowKeyInput(false);
+    showToast('Service key saved locally');
   };
 
-  const handleToggleActive = async (user) => {
-    const fn = user.is_active ? deactivateUser : activateUser;
-    const { error } = await fn(user.id);
-    if (error) showToast(error.message, 'error');
-    else { showToast(`User ${user.is_active ? 'deactivated' : 'activated'}`); refresh(); }
-    setConfirmAction(null);
+  const handleCreate = async () => {
+    if (!form.full_name || !form.email || !form.password) {
+      showToast('Fill all fields', 'error'); return;
+    }
+    if (form.password.length < 6) {
+      showToast('Password must be at least 6 characters', 'error'); return;
+    }
+    if (!serviceKey) {
+      showToast('Service role key required', 'error');
+      setShowKeyInput(true); return;
+    }
+    setLoading(true);
+
+    try {
+      // Use service role key to create auth user
+      const SUPABASE_URL = 'https://tonlofhigkpbcsmfesjq.supabase.co';
+
+      const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+          email_confirm: true,
+          user_metadata: { full_name: form.full_name }
+        })
+      });
+
+      const authData = await authRes.json();
+
+      if (!authRes.ok || authData.error) {
+        throw new Error(authData.error?.message || authData.msg || 'Failed to create auth user');
+      }
+
+      const userId = authData.id;
+
+      // Insert profile
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: userId,
+        email: form.email,
+        full_name: form.full_name,
+        role: form.role,
+        is_active: true,
+        created_by: profile.id,
+      });
+
+      if (profileError) throw profileError;
+
+      showToast(`✓ ${form.full_name} created as ${form.role}`);
+      setForm({ full_name: '', email: '', password: '', role: 'admin' });
+      refresh();
+      setActive('users');
+    } catch (e) {
+      showToast(e.message || 'Failed to create user', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div>
       <div className="vx-topbar">
-        <h1 className="vx-page-title" style={{ color: '#a78bfa' }}>User Management</h1>
-        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{users.length} staff</div>
+        <h1 className="vx-page-title" style={{ color: '#a78bfa' }}>Create Staff User</h1>
+      </div>
+      <div style={{ maxWidth: 520 }}>
+
+        {/* Service Key Setup */}
+        {showKeyInput && (
+          <div className="vx-card" style={{ marginBottom: '1rem', borderColor: 'rgba(124,58,237,0.4)' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.9rem', fontWeight: 600, color: '#a78bfa', marginBottom: '0.75rem', letterSpacing: 2 }}>
+              ⚡ ONE-TIME SETUP
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.6 }}>
+              To create auth users, enter your Supabase <strong style={{ color: 'var(--text-primary)' }}>service_role key</strong>.
+              <br />Find it at: Supabase → Settings → API → service_role
+            </p>
+            <div className="vx-form-group">
+              <label className="vx-label">Service Role Key</label>
+              <input
+                className="vx-input"
+                type="password"
+                placeholder="eyJhbGciOiJIUzI1NiIs..."
+                value={serviceKey}
+                onChange={e => setServiceKey(e.target.value)}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button className="vx-btn vx-btn-primary" onClick={saveServiceKey} style={{ flex: 1, justifyContent: 'center', background: '#7c3aed' }}>
+                Save Key
+              </button>
+              {localStorage.getItem('vx_service_key') && (
+                <button className="vx-btn vx-btn-secondary" onClick={() => setShowKeyInput(false)} style={{ flex: 1, justifyContent: 'center' }}>
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!showKeyInput && (
+          <div className="vx-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: 2, textTransform: 'uppercase' }}>
+                New Staff Account
+              </div>
+              <button className="vx-btn vx-btn-secondary vx-btn-sm" onClick={() => setShowKeyInput(true)}>
+                Change Key
+              </button>
+            </div>
+
+            <div className="vx-form-group">
+              <label className="vx-label">Full Name</label>
+              <input className="vx-input" placeholder="John Banda" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} />
+            </div>
+            <div className="vx-form-group">
+              <label className="vx-label">Email Address</label>
+              <input className="vx-input" type="email" placeholder="john@vertexgo.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+            </div>
+            <div className="vx-form-group">
+              <label className="vx-label">Password</label>
+              <input className="vx-input" type="password" placeholder="Min 6 characters" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+            </div>
+            <div className="vx-form-group" style={{ marginBottom: '0.75rem' }}>
+              <label className="vx-label">Role</label>
+              <select className="vx-select" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
+                <option value="enroller">Enroller — Enroll customers & generate tokens</option>
+                <option value="admin">Admin — Enroller + record payments & lock/unlock</option>
+                <option value="super_admin">Super Admin — Full system control</option>
+              </select>
+            </div>
+
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '0.75rem', marginBottom: '1.25rem', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              {form.role === 'enroller' && '📋 Can enroll customers, upload IDs, link devices, generate enrollment QR tokens.'}
+              {form.role === 'admin' && '🔧 All enroller permissions + record payments, manually lock/unlock devices.'}
+              {form.role === 'super_admin' && '⬡ All permissions + create/remove users, change roles, view all reports.'}
+            </div>
+
+            <button
+              className="vx-btn vx-btn-primary"
+              style={{ width: '100%', justifyContent: 'center', padding: '0.875rem', fontSize: '0.95rem', letterSpacing: '2px', background: '#7c3aed' }}
+              onClick={handleCreate}
+              disabled={loading}
+            >
+              {loading ? 'CREATING...' : '⊕ CREATE USER'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── User Management ───────────────────────────────────────────────────────────
+function UserManagement({ users, profile, refresh, showToast }) {
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [serviceKey] = useState(localStorage.getItem('vx_service_key') || '');
+
+  const handleRoleChange = async (userId, newRole) => {
+    if (userId === profile.id) { showToast('Cannot change your own role', 'error'); return; }
+    const { error } = await updateUserRole(userId, newRole);
+    if (error) showToast(error.message, 'error');
+    else { showToast('Role updated successfully'); refresh(); }
+  };
+
+  const handleToggleActive = async (user) => {
+    if (user.id === profile.id) { showToast('Cannot deactivate yourself', 'error'); return; }
+    const { error } = user.is_active ? await deactivateUser(user.id) : await activateUser(user.id);
+    if (error) showToast(error.message, 'error');
+    else {
+      showToast(`User ${user.is_active ? 'deactivated — access revoked' : 'activated — access restored'}`);
+      refresh();
+    }
+    setConfirmAction(null);
+  };
+
+  const handleDelete = async (user) => {
+    if (user.id === profile.id) { showToast('Cannot delete yourself', 'error'); return; }
+
+    try {
+      // Delete profile first
+      await supabase.from('profiles').delete().eq('id', user.id);
+
+      // Delete auth user if service key available
+      if (serviceKey) {
+        await fetch(`https://tonlofhigkpbcsmfesjq.supabase.co/auth/v1/admin/users/${user.id}`, {
+          method: 'DELETE',
+          headers: {
+            'apikey': serviceKey,
+            'Authorization': `Bearer ${serviceKey}`,
+          }
+        });
+      }
+
+      showToast(`${user.full_name} deleted permanently`);
+      refresh();
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+    setConfirmAction(null);
+  };
+
+  const activeUsers = users.filter(u => u.is_active);
+  const inactiveUsers = users.filter(u => !u.is_active);
+
+  return (
+    <div>
+      <div className="vx-topbar">
+        <h1 className="vx-page-title" style={{ color: '#a78bfa' }}>Staff Management</h1>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+          {activeUsers.length} active · {inactiveUsers.length} deactivated
+        </div>
       </div>
 
-      <div className="vx-card" style={{ padding: 0, overflow: 'hidden' }}>
+      {/* Active Users */}
+      <div style={{ marginBottom: '0.75rem', fontFamily: 'var(--font-display)', fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-green)', letterSpacing: 2, textTransform: 'uppercase' }}>
+        Active Staff
+      </div>
+      <div className="vx-card" style={{ padding: 0, overflow: 'hidden', marginBottom: '1.5rem' }}>
         <div style={{ overflowX: 'auto' }}>
           <table className="vx-table">
             <thead>
@@ -187,17 +396,18 @@ function UserManagement({ users, profile, refresh, showToast }) {
                 <th>Name</th>
                 <th>Email</th>
                 <th>Role</th>
-                <th>Status</th>
                 <th>Joined</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users.map(u => (
-                <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.5 }}>
+              {activeUsers.map(u => (
+                <tr key={u.id}>
                   <td style={{ fontWeight: 600 }}>
                     {u.full_name}
-                    {u.id === profile.id && <span style={{ marginLeft: 6, fontSize: '0.7rem', color: 'var(--accent-cyan)' }}>(you)</span>}
+                    {u.id === profile.id && (
+                      <span style={{ marginLeft: 6, fontSize: '0.7rem', color: 'var(--accent-cyan)', background: 'rgba(0,212,255,0.1)', padding: '1px 6px', borderRadius: 10 }}>YOU</span>
+                    )}
                   </td>
                   <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{u.email}</td>
                   <td>
@@ -216,45 +426,111 @@ function UserManagement({ users, profile, refresh, showToast }) {
                       <span className="vx-badge vx-badge-purple">{u.role}</span>
                     )}
                   </td>
-                  <td>
-                    <span className={`vx-badge ${u.is_active ? 'vx-badge-success' : 'vx-badge-danger'}`}>
-                      {u.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
                   <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                     {new Date(u.created_at).toLocaleDateString()}
                   </td>
                   <td>
                     {u.id !== profile.id && (
-                      <button
-                        className={`vx-btn vx-btn-sm ${u.is_active ? 'vx-btn-danger' : 'vx-btn-success'}`}
-                        onClick={() => setConfirmAction(u)}
-                      >
-                        {u.is_active ? 'Deactivate' : 'Activate'}
-                      </button>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button
+                          className="vx-btn vx-btn-danger vx-btn-sm"
+                          onClick={() => setConfirmAction({ type: 'deactivate', user: u })}
+                        >
+                          Deactivate
+                        </button>
+                        <button
+                          className="vx-btn vx-btn-sm"
+                          style={{ background: 'rgba(255,51,85,0.3)', color: '#ff3355', border: '1px solid rgba(255,51,85,0.5)' }}
+                          onClick={() => setConfirmAction({ type: 'delete', user: u })}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
               ))}
+              {activeUsers.length === 0 && (
+                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>No active users</td></tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
+      {/* Deactivated Users */}
+      {inactiveUsers.length > 0 && (
+        <>
+          <div style={{ marginBottom: '0.75rem', fontFamily: 'var(--font-display)', fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-red)', letterSpacing: 2, textTransform: 'uppercase' }}>
+            Deactivated Staff (No Access)
+          </div>
+          <div className="vx-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="vx-table">
+                <thead>
+                  <tr><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {inactiveUsers.map(u => (
+                    <tr key={u.id} style={{ opacity: 0.6 }}>
+                      <td style={{ fontWeight: 600 }}>{u.full_name}</td>
+                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{u.email}</td>
+                      <td><span className="vx-badge vx-badge-danger">{u.role}</span></td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button className="vx-btn vx-btn-success vx-btn-sm" onClick={() => setConfirmAction({ type: 'activate', user: u })}>
+                            Restore
+                          </button>
+                          <button
+                            className="vx-btn vx-btn-sm"
+                            style={{ background: 'rgba(255,51,85,0.3)', color: '#ff3355', border: '1px solid rgba(255,51,85,0.5)' }}
+                            onClick={() => setConfirmAction({ type: 'delete', user: u })}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Confirm Modal */}
       {confirmAction && (
         <div className="vx-modal-overlay" onClick={() => setConfirmAction(null)}>
-          <div className="vx-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400, textAlign: 'center' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>{confirmAction.is_active ? '⚠️' : '✅'}</div>
-            <h3 style={{ marginBottom: 8, fontFamily: 'var(--font-display)', fontSize: '1.2rem' }}>
-              {confirmAction.is_active ? 'Deactivate User?' : 'Activate User?'}
+          <div className="vx-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420, textAlign: 'center' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>
+              {confirmAction.type === 'delete' ? '🗑️' : confirmAction.type === 'deactivate' ? '⚠️' : '✅'}
+            </div>
+            <h3 style={{ marginBottom: 8, fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: confirmAction.type === 'delete' ? 'var(--accent-red)' : 'var(--text-primary)' }}>
+              {confirmAction.type === 'delete' ? 'Delete User Permanently?' :
+               confirmAction.type === 'deactivate' ? 'Deactivate User?' : 'Restore User?'}
             </h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-              {confirmAction.full_name} ({confirmAction.role}) will {confirmAction.is_active ? 'lose all access' : 'regain access'}.
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+              <strong style={{ color: 'var(--text-primary)' }}>{confirmAction.user.full_name}</strong> · {confirmAction.user.role}
+            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+              {confirmAction.type === 'delete' && 'This cannot be undone. The user will be permanently removed from the system.'}
+              {confirmAction.type === 'deactivate' && 'User will immediately lose all access to the system. They cannot log in.'}
+              {confirmAction.type === 'activate' && 'User will regain their previous access level.'}
             </p>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button className="vx-btn vx-btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setConfirmAction(null)}>Cancel</button>
-              <button className={`vx-btn ${confirmAction.is_active ? 'vx-btn-danger' : 'vx-btn-success'}`} style={{ flex: 1, justifyContent: 'center' }} onClick={() => handleToggleActive(confirmAction)}>
-                {confirmAction.is_active ? 'Deactivate' : 'Activate'}
+              <button className="vx-btn vx-btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setConfirmAction(null)}>
+                Cancel
+              </button>
+              <button
+                className={`vx-btn ${confirmAction.type === 'activate' ? 'vx-btn-success' : 'vx-btn-danger'}`}
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={() => {
+                  if (confirmAction.type === 'delete') handleDelete(confirmAction.user);
+                  else handleToggleActive(confirmAction.user);
+                }}
+              >
+                {confirmAction.type === 'delete' ? 'Delete' : confirmAction.type === 'deactivate' ? 'Deactivate' : 'Restore'}
               </button>
             </div>
           </div>
@@ -264,116 +540,26 @@ function UserManagement({ users, profile, refresh, showToast }) {
   );
 }
 
-// ─── Create User ──────────────────────────────────────────────────────────────
-function CreateUser({ refresh, showToast, profile, setActive }) {
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', role: 'enroller' });
-  const [loading, setLoading] = useState(false);
-
-  const handleCreate = async () => {
-    if (!form.full_name || !form.email || !form.password) {
-      showToast('Fill all fields', 'error'); return;
-    }
-    setLoading(true);
-    try {
-      // Create auth user via Supabase admin API (requires service role — use edge function in production)
-      // For now use regular signUp + insert profile
-      const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
-        email: form.email,
-        password: form.password,
-        email_confirm: true,
-        user_metadata: { full_name: form.full_name }
-      });
-      if (authErr) throw authErr;
-
-      const { error: profileErr } = await supabase.from('profiles').insert({
-        id: authData.user.id,
-        email: form.email,
-        full_name: form.full_name,
-        role: form.role,
-        created_by: profile.id,
-      });
-      if (profileErr) throw profileErr;
-
-      showToast(`User ${form.full_name} created as ${form.role}`);
-      setForm({ full_name: '', email: '', password: '', role: 'enroller' });
-      refresh();
-      setActive('users');
-    } catch (e) {
-      showToast(e.message || 'Failed to create user', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div>
-      <div className="vx-topbar">
-        <h1 className="vx-page-title" style={{ color: '#a78bfa' }}>Create User</h1>
-      </div>
-      <div style={{ maxWidth: 480 }}>
-        <div className="vx-card">
-          <div className="vx-alert vx-alert-info" style={{ marginBottom: '1.5rem' }}>
-            New users will receive login credentials. Assign roles carefully — Super Admin has full system control.
-          </div>
-          <div className="vx-form-group">
-            <label className="vx-label">Full Name</label>
-            <input className="vx-input" placeholder="Jane Smith" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} />
-          </div>
-          <div className="vx-form-group">
-            <label className="vx-label">Email Address</label>
-            <input className="vx-input" type="email" placeholder="jane@vertexgo.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-          </div>
-          <div className="vx-form-group">
-            <label className="vx-label">Initial Password</label>
-            <input className="vx-input" type="password" placeholder="Min 8 characters" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
-          </div>
-          <div className="vx-form-group" style={{ marginBottom: '1.5rem' }}>
-            <label className="vx-label">Role</label>
-            <select className="vx-select" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
-              <option value="enroller">Enroller — Can enroll customers & devices</option>
-              <option value="admin">Admin — Enroller + record payments, manage loans</option>
-              <option value="super_admin">Super Admin — Full control</option>
-            </select>
-          </div>
-
-          {/* Role description */}
-          <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '0.875rem', marginBottom: '1.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            {form.role === 'enroller' && '📋 Enroller: Can add customers, link devices, generate enrollment tokens.'}
-            {form.role === 'admin' && '🔧 Admin: All enroller permissions + record payments, lock/unlock devices manually.'}
-            {form.role === 'super_admin' && '⬡ Super Admin: All permissions + create/remove users, change roles, view all reports.'}
-          </div>
-
-          <button className="vx-btn vx-btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.8rem', fontSize: '0.95rem', letterSpacing: '2px', background: '#7c3aed' }} onClick={handleCreate} disabled={loading}>
-            {loading ? 'Creating...' : '⊕ CREATE USER'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── All Loans (super admin view) ─────────────────────────────────────────────
+// ── All Loans ─────────────────────────────────────────────────────────────────
 function AllLoans({ loans }) {
   const totalRevenue = loans.reduce((s, l) => s + Number(l.total_paid || 0), 0);
   const totalOutstanding = loans.reduce((s, l) => s + Number(l.balance_due || 0), 0);
-
   return (
     <div>
       <div className="vx-topbar">
         <h1 className="vx-page-title" style={{ color: '#a78bfa' }}>All Loans</h1>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="vx-stat green"><div className="vx-stat-value">K{totalRevenue.toFixed(0)}</div><div className="vx-stat-label">Total Collected</div></div>
-        <div className="vx-stat orange"><div className="vx-stat-value">K{totalOutstanding.toFixed(0)}</div><div className="vx-stat-label">Total Outstanding</div></div>
+        <div className="vx-stat orange"><div className="vx-stat-value">K{totalOutstanding.toFixed(0)}</div><div className="vx-stat-label">Outstanding</div></div>
         <div className="vx-stat"><div className="vx-stat-value">{loans.length}</div><div className="vx-stat-label">Total Loans</div></div>
       </div>
       <div className="vx-card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table className="vx-table">
-            <thead>
-              <tr><th>Customer</th><th>Device</th><th>Price</th><th>Paid</th><th>Balance</th><th>Daily</th><th>Status</th></tr>
-            </thead>
+            <thead><tr><th>Customer</th><th>Device</th><th>Price</th><th>Paid</th><th>Balance</th><th>Daily</th><th>Status</th></tr></thead>
             <tbody>
+              {loans.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>No loans yet</td></tr>}
               {loans.map(l => (
                 <tr key={l.id}>
                   <td style={{ fontWeight: 600 }}>{l.customers?.full_name}</td>
@@ -393,7 +579,7 @@ function AllLoans({ loans }) {
   );
 }
 
-// ─── All Customers ────────────────────────────────────────────────────────────
+// ── All Customers ─────────────────────────────────────────────────────────────
 function AllCustomers({ customers }) {
   return (
     <div>
@@ -404,10 +590,9 @@ function AllCustomers({ customers }) {
       <div className="vx-card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table className="vx-table">
-            <thead>
-              <tr><th>Name</th><th>Account #</th><th>Phone</th><th>ID Number</th><th>Enrolled</th></tr>
-            </thead>
+            <thead><tr><th>Name</th><th>Account #</th><th>Phone</th><th>ID Number</th><th>Enrolled</th></tr></thead>
             <tbody>
+              {customers.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>No customers yet</td></tr>}
               {customers.map(c => (
                 <tr key={c.id}>
                   <td style={{ fontWeight: 600 }}>{c.full_name}</td>
@@ -425,7 +610,7 @@ function AllCustomers({ customers }) {
   );
 }
 
-// ─── Reports ──────────────────────────────────────────────────────────────────
+// ── Reports ───────────────────────────────────────────────────────────────────
 function Reports({ stats, loans }) {
   const byStatus = {
     active: loans.filter(l => l.status === 'active').length,
@@ -433,7 +618,6 @@ function Reports({ stats, loans }) {
     defaulted: loans.filter(l => l.status === 'defaulted').length,
   };
   const collectionRate = loans.length > 0 ? ((byStatus.completed / loans.length) * 100).toFixed(1) : 0;
-
   return (
     <div>
       <div className="vx-topbar">
@@ -441,9 +625,7 @@ function Reports({ stats, loans }) {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
         <div className="vx-card">
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.9rem' }}>
-            Loan Portfolio
-          </div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.9rem' }}>Loan Portfolio</div>
           {Object.entries(byStatus).map(([status, count]) => (
             <div key={status} style={{ marginBottom: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: '0.85rem' }}>
@@ -451,10 +633,7 @@ function Reports({ stats, loans }) {
                 <span style={{ fontWeight: 600 }}>{count}</span>
               </div>
               <div className="vx-progress">
-                <div className="vx-progress-bar" style={{
-                  width: `${loans.length > 0 ? (count / loans.length) * 100 : 0}%`,
-                  background: status === 'completed' ? 'var(--accent-green)' : status === 'defaulted' ? 'var(--accent-red)' : 'var(--accent-cyan)'
-                }} />
+                <div className="vx-progress-bar" style={{ width: `${loans.length > 0 ? (count / loans.length) * 100 : 0}%`, background: status === 'completed' ? 'var(--accent-green)' : status === 'defaulted' ? 'var(--accent-red)' : 'var(--accent-cyan)' }} />
               </div>
             </div>
           ))}
@@ -463,11 +642,8 @@ function Reports({ stats, loans }) {
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase' }}>Collection Rate</div>
           </div>
         </div>
-
         <div className="vx-card">
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.9rem' }}>
-            Key Metrics
-          </div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.9rem' }}>Key Metrics</div>
           {[
             { label: 'Total Customers', value: stats.totalCustomers || 0 },
             { label: 'Active Loans', value: stats.activeLoans || 0 },

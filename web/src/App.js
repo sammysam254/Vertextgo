@@ -7,26 +7,24 @@ import AdminDashboard from './pages/AdminDashboard';
 import CustomerDashboard from './pages/CustomerDashboard';
 import EnrollDevice from './pages/EnrollDevice';
 
-const PrivateRoute = ({ children, roles }) => {
-  const { user, profile, loading } = useAuth();
-  if (loading) return <LoadingScreen />;
-  if (!user || !profile) return <Navigate to="/login" replace />;
-  if (roles && !roles.includes(profile.role)) return <Navigate to="/unauthorized" replace />;
-  if (!profile.is_active) return <Navigate to="/login" replace />;
-  return children;
-};
-
 const LoadingScreen = () => (
-  <div style={{
-    minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: '#0a0e1a', color: '#00d4ff', fontFamily: 'monospace', fontSize: '1.2rem'
-  }}>
+  <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0e1a', color: '#00d4ff', fontFamily: 'monospace' }}>
     <div style={{ textAlign: 'center' }}>
       <div className="vx-spinner" />
       <p style={{ marginTop: 16, letterSpacing: 4 }}>VERTEX GO</p>
     </div>
   </div>
 );
+
+const PrivateRoute = ({ children, roles }) => {
+  const { user, profile, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (!user || !profile) return <Navigate to="/login" replace />;
+  // Kick out deactivated users immediately
+  if (!profile.is_active) return <Navigate to="/login" replace />;
+  if (roles && !roles.includes(profile.role)) return <Navigate to="/login" replace />;
+  return children;
+};
 
 const Router = () => {
   const { profile, loading } = useAuth();
@@ -48,16 +46,12 @@ const Router = () => {
         </PrivateRoute>
       } />
       <Route path="/" element={
-        profile ? (
-          profile.role === 'super_admin' ? <Navigate to="/super-admin" replace /> :
-          <Navigate to="/admin" replace />
-        ) : <Navigate to="/login" replace />
+        !profile ? <Navigate to="/login" replace /> :
+        !profile.is_active ? <Navigate to="/login" replace /> :
+        profile.role === 'super_admin' ? <Navigate to="/super-admin" replace /> :
+        <Navigate to="/admin" replace />
       } />
-      <Route path="/unauthorized" element={
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0e1a', color: '#ff4444' }}>
-          <h1>Access Denied</h1>
-        </div>
-      } />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 };
