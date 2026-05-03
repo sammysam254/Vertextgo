@@ -4,13 +4,13 @@ const supabaseUrl =
   (window.__env__ && window.__env__.SUPABASE_URL &&
    window.__env__.SUPABASE_URL !== 'RENDER_SUPABASE_URL_PLACEHOLDER')
     ? window.__env__.SUPABASE_URL
-    : 'https://xnucognonukoctesjjrr.supabase.co';
+    : 'https://tonlofhigkpbcsmfesjq.supabase.co';
 
 const supabaseAnonKey =
   (window.__env__ && window.__env__.SUPABASE_ANON_KEY &&
    window.__env__.SUPABASE_ANON_KEY !== 'RENDER_SUPABASE_ANON_KEY_PLACEHOLDER')
     ? window.__env__.SUPABASE_ANON_KEY
-    : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhudWNvZ25vbnVrb2N0ZXNqanJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MDU4NzUsImV4cCI6MjA5MzM4MTg3NX0.CrbqjtS-YWpa6JjNYhptQ3J40Ba4l7Qm88HepU9m2k0';
+    : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvbmxvZmhpZ2twYmNzbWZlc2pxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MjE2MzUsImV4cCI6MjA5MzM5NzYzNX0.fgbSNhM_Tjfw7IlmQfQkR2Fc1qgKQkpbJGqbyyiyXXk';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
