@@ -14,47 +14,66 @@ export const AuthProvider = ({ children }) => {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
-      if (error) {
-        console.error('Profile fetch error:', error);
-        return null;
-      }
+        .maybeSingle();
+      if (error) { console.error('Profile error:', error); return null; }
       return data;
     } catch (e) {
-      console.error('Profile fetch exception:', e);
+      console.error('Profile exception:', e);
       return null;
     }
   };
 
   useEffect(() => {
+    let mounted = true;
+
     const init = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
         if (session?.user) {
           setUser(session.user);
           const p = await fetchProfile(session.user.id);
-          setProfile(p);
+          if (mounted) setProfile(p);
         }
       } catch (e) {
         console.error('Init error:', e);
       } finally {
-        setLoading(false);
+        // ALWAYS set loading false — even on error
+        if (mounted) setLoading(false);
       }
     };
-    init();
+
+    // Safety timeout — never stay loading more than 5 seconds
+    const timeout = setTimeout(() => {
+      if (mounted) setLoading(false);
+    }, 5000);
+
+    init().then(() => clearTimeout(timeout));
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
       if (session?.user) {
         setUser(session.user);
         const p = await fetchProfile(session.user.id);
-        setProfile(p);
+        if (mounted) { setProfile(p); setLoading(false); }
       } else {
         setUser(null);
         setProfile(null);
+        if (mounted) setLoading(false);
       }
-      setLoading(false);
     });
-    return () => listener.subscription.unsubscribe();
+
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   return (

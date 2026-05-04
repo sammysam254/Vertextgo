@@ -1,28 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Sidebar from '../components/Sidebar';
 import { useAuth } from '../hooks/useAuth';
-import {
-  supabase, getCustomers, getDevices, getLoans, getDashboardStats,
-  createCustomer, createDevice, createLoan, createEnrollmentToken,
-  recordPayment, getPayments, issueCommand, updateDevice
-} from '../lib/supabase';
-
-const SIDEBAR_ITEMS = [
-  { id: 'overview', label: 'Overview', icon: '◈' },
-  { section: 'CUSTOMERS' },
-  { id: 'customers', label: 'All Customers', icon: '◉' },
-  { id: 'enroll-customer', label: 'Enroll Customer', icon: '⊕' },
-  { section: 'DEVICES' },
-  { id: 'devices', label: 'Device Fleet', icon: '⬡' },
-  { id: 'enroll-device', label: 'Link to Device', icon: '⊞' },
-  { section: 'LOANS' },
-  { id: 'loans', label: 'Active Loans', icon: '◑' },
-  { id: 'payments', label: 'Record Payment', icon: '✦' },
-];
+import { signOut, supabase, getCustomers, getDevices, getLoans,
+  getDashboardStats, createCustomer, createDevice, createLoan,
+  createEnrollmentToken, recordPayment, getPayments, issueCommand, updateDevice } from '../lib/supabase';
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
   const [active, setActive] = useState('overview');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [stats, setStats] = useState({});
   const [customers, setCustomers] = useState([]);
   const [devices, setDevices] = useState([]);
@@ -37,51 +22,104 @@ export default function AdminDashboard() {
 
   const refresh = async () => {
     setLoading(true);
-    const [s, c, d, l] = await Promise.all([getDashboardStats(), getCustomers(), getDevices(), getLoans()]);
-    setStats(s);
-    setCustomers(c.data || []);
-    setDevices(d.data || []);
-    setLoans(l.data || []);
+    try {
+      const [s, c, d, l] = await Promise.all([
+        getDashboardStats(), getCustomers(), getDevices(), getLoans()
+      ]);
+      setStats(s || {});
+      setCustomers(c.data || []);
+      setDevices(d.data || []);
+      setLoans(l.data || []);
+    } catch (e) { console.error(e); }
     setLoading(false);
   };
 
   useEffect(() => { refresh(); }, []);
+
+  const handleSignOut = async () => {
+    await signOut();
+    window.location.href = '/login';
+  };
+
+  const NAV = [
+    { id: 'overview', label: 'Overview', icon: '◈' },
+    { id: 'customers', label: 'Customers', icon: '◉' },
+    { id: 'enroll-customer', label: 'Enroll Customer', icon: '⊕' },
+    { id: 'devices', label: 'Devices', icon: '⬡' },
+    { id: 'enroll-device', label: 'Link Device', icon: '⊞' },
+    { id: 'loans', label: 'Loans', icon: '◑' },
+    { id: 'payments', label: 'Record Payment', icon: '✦' },
+  ];
 
   const pages = {
     overview: <Overview stats={stats} loans={loans} />,
     customers: <CustomersList customers={customers} refresh={refresh} showToast={showToast} profile={profile} />,
     'enroll-customer': <EnrollCustomer refresh={refresh} showToast={showToast} profile={profile} setActive={setActive} />,
     devices: <DevicesList devices={devices} refresh={refresh} showToast={showToast} profile={profile} />,
-    'enroll-device': <LinkDeviceToCustomer customers={customers} devices={devices} refresh={refresh} showToast={showToast} profile={profile} />,
-    loans: <LoansList loans={loans} refresh={refresh} showToast={showToast} profile={profile} />,
+    'enroll-device': <LinkDevice customers={customers} devices={devices} refresh={refresh} showToast={showToast} profile={profile} />,
+    loans: <LoansList loans={loans} />,
     payments: <RecordPayment loans={loans} refresh={refresh} showToast={showToast} profile={profile} />,
   };
 
   return (
-    <div className="vx-layout">
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', position: 'relative' }}>
       <div className="vx-grid-bg" />
-      <Sidebar items={SIDEBAR_ITEMS} activeItem={active} onSelect={setActive} role={profile?.role} />
 
-      <main className="vx-main" style={{ position: 'relative', zIndex: 1 }}>
-        {loading && active === 'overview' ? (
+      {/* Mobile Top Bar */}
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200, background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 1rem', height: 56 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-cyan)', letterSpacing: 3 }}>VERTEX GO</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile?.full_name}</span>
+          <button onClick={() => setMenuOpen(!menuOpen)} style={{ background: 'none', border: 'none', color: 'var(--accent-cyan)', fontSize: '1.4rem', cursor: 'pointer', padding: '4px 8px' }}>
+            {menuOpen ? '✕' : '☰'}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Slide-down Menu */}
+      {menuOpen && (
+        <div style={{ position: 'fixed', top: 56, left: 0, right: 0, zIndex: 199, background: 'var(--bg-secondary)', borderBottom: '2px solid var(--border-bright)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
+          {NAV.map(item => (
+            <div key={item.id}
+              onClick={() => { setActive(item.id); setMenuOpen(false); }}
+              style={{ padding: '0.875rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', color: active === item.id ? 'var(--accent-cyan)' : 'var(--text-secondary)', background: active === item.id ? 'rgba(0,212,255,0.08)' : 'transparent', fontSize: '0.95rem', fontWeight: active === item.id ? 600 : 400 }}>
+              <span>{item.icon}</span><span>{item.label}</span>
+              {active === item.id && <span style={{ marginLeft: 'auto', color: 'var(--accent-cyan)' }}>▸</span>}
+            </div>
+          ))}
+          <div onClick={handleSignOut} style={{ padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', color: 'var(--accent-red)', fontSize: '0.95rem' }}>
+            <span>⏻</span><span>Sign Out</span>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Tab Bar (mobile) */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200, background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)', display: 'flex', overflowX: 'auto' }}>
+        {NAV.slice(0, 5).map(item => (
+          <button key={item.id} onClick={() => { setActive(item.id); setMenuOpen(false); }}
+            style={{ flex: 1, minWidth: 56, padding: '8px 4px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, color: active === item.id ? 'var(--accent-cyan)' : 'var(--text-muted)', borderTop: active === item.id ? '2px solid var(--accent-cyan)' : '2px solid transparent', transition: 'all 0.15s' }}>
+            <span style={{ fontSize: '1.1rem' }}>{item.icon}</span>
+            <span style={{ fontSize: '0.6rem', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>{item.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Main Content */}
+      <div style={{ paddingTop: 64, paddingBottom: 72, minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+        {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <div className="vx-spinner" />
           </div>
         ) : (
-          <div className="fade-in">{pages[active]}</div>
+          <div style={{ padding: '1rem', maxWidth: 900, margin: '0 auto' }} className="fade-in">
+            {pages[active]}
+          </div>
         )}
-      </main>
+      </div>
 
       {/* Toast */}
       {toast && (
-        <div style={{
-          position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 9999,
-          background: toast.type === 'success' ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,85,0.15)',
-          border: `1px solid ${toast.type === 'success' ? 'rgba(0,255,136,0.4)' : 'rgba(255,51,85,0.4)'}`,
-          color: toast.type === 'success' ? 'var(--accent-green)' : 'var(--accent-red)',
-          borderRadius: '8px', padding: '1rem 1.5rem', fontWeight: 600,
-          boxShadow: '0 10px 30px rgba(0,0,0,0.4)', animation: 'fadeIn 0.3s ease'
-        }}>
+        <div style={{ position: 'fixed', bottom: '5rem', left: '1rem', right: '1rem', zIndex: 9999, background: toast.type === 'success' ? 'rgba(0,255,136,0.15)' : 'rgba(255,51,85,0.15)', border: `1px solid ${toast.type === 'success' ? 'rgba(0,255,136,0.4)' : 'rgba(255,51,85,0.4)'}`, color: toast.type === 'success' ? 'var(--accent-green)' : 'var(--accent-red)', borderRadius: 8, padding: '0.875rem 1rem', fontWeight: 600, boxShadow: '0 10px 30px rgba(0,0,0,0.4)', animation: 'fadeIn 0.3s ease', textAlign: 'center' }}>
           {toast.type === 'success' ? '✓' : '⚠'} {toast.msg}
         </div>
       )}
@@ -89,78 +127,48 @@ export default function AdminDashboard() {
   );
 }
 
-// ─── Overview ─────────────────────────────────────────────────────────────────
+// ── Overview ──────────────────────────────────────────────────────────────────
 function Overview({ stats, loans }) {
   return (
     <div>
-      <div className="vx-topbar">
-        <h1 className="vx-page-title" style={{ color: 'var(--accent-cyan)' }}>Dashboard</h1>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </div>
+      <div style={{ marginBottom: '1.25rem' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent-cyan)', letterSpacing: 2 }}>Dashboard</h1>
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
       </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-        <div className="vx-stat">
-          <div className="vx-stat-value">{stats.totalCustomers ?? '—'}</div>
-          <div className="vx-stat-label">Total Customers</div>
-        </div>
-        <div className="vx-stat green">
-          <div className="vx-stat-value" style={{ color: 'var(--accent-green)' }}>{stats.activeLoans ?? '—'}</div>
-          <div className="vx-stat-label">Active Loans</div>
-        </div>
-        <div className="vx-stat red">
-          <div className="vx-stat-value" style={{ color: 'var(--accent-red)' }}>{stats.overdueLoans ?? '—'}</div>
-          <div className="vx-stat-label">Overdue Today</div>
-        </div>
-        <div className="vx-stat orange">
-          <div className="vx-stat-value" style={{ color: 'var(--accent-orange)' }}>
-            K{(stats.monthlyRevenue || 0).toFixed(0)}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        {[
+          { label: 'Customers', value: stats.totalCustomers ?? 0, cls: '' },
+          { label: 'Active Loans', value: stats.activeLoans ?? 0, cls: 'green' },
+          { label: 'Overdue', value: stats.overdueLoans ?? 0, cls: 'red' },
+          { label: 'Revenue (MTD)', value: `K${(stats.monthlyRevenue || 0).toFixed(0)}`, cls: 'orange' },
+        ].map((s, i) => (
+          <div className={`vx-stat ${s.cls}`} key={i}>
+            <div className="vx-stat-value" style={{ fontSize: '1.6rem' }}>{s.value}</div>
+            <div className="vx-stat-label">{s.label}</div>
           </div>
-          <div className="vx-stat-label">This Month Revenue</div>
-        </div>
+        ))}
       </div>
-
-      <div className="vx-card">
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-          Recent Active Loans
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="vx-table">
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th>Device</th>
-                <th>Daily Rate</th>
-                <th>Balance</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loans.slice(0, 8).map(loan => (
-                <tr key={loan.id}>
-                  <td>{loan.customers?.full_name || '—'}</td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{loan.devices?.device_model || loan.devices?.device_name || '—'}</td>
-                  <td>K{loan.daily_rate}</td>
-                  <td style={{ color: loan.balance_due > 0 ? 'var(--accent-orange)' : 'var(--accent-green)' }}>
-                    K{(loan.balance_due || 0).toFixed(2)}
-                  </td>
-                  <td>
-                    <span className={`vx-badge ${loan.status === 'active' ? 'vx-badge-info' : loan.status === 'completed' ? 'vx-badge-success' : 'vx-badge-danger'}`}>
-                      {loan.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="vx-card" style={{ padding: '1rem' }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.8rem', fontWeight: 600, letterSpacing: 2, color: 'var(--text-secondary)', marginBottom: '0.875rem', textTransform: 'uppercase' }}>Recent Loans</div>
+        {loans.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem', textAlign: 'center', padding: '1rem' }}>No loans yet</div>}
+        {loans.slice(0, 5).map(loan => (
+          <div key={loan.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.625rem 0', borderBottom: '1px solid var(--border)' }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{loan.customers?.full_name}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{loan.devices?.device_model || '—'} · K{loan.daily_rate}/day</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ color: loan.balance_due > 0 ? 'var(--accent-orange)' : 'var(--accent-green)', fontWeight: 700, fontSize: '0.875rem' }}>K{(loan.balance_due || 0).toFixed(0)}</div>
+              <span className={`vx-badge ${loan.status === 'active' ? 'vx-badge-info' : 'vx-badge-success'}`} style={{ fontSize: '0.65rem' }}>{loan.status}</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-// ─── Enroll Customer ──────────────────────────────────────────────────────────
+// ── Enroll Customer ───────────────────────────────────────────────────────────
 function EnrollCustomer({ refresh, showToast, profile, setActive }) {
   const [form, setForm] = useState({ full_name: '', phone_number: '', id_number: '' });
   const [idFile, setIdFile] = useState(null);
@@ -178,101 +186,120 @@ function EnrollCustomer({ refresh, showToast, profile, setActive }) {
   };
 
   const handleSubmit = async () => {
-    if (!form.full_name || !form.phone_number || !form.id_number) {
+    if (!form.full_name.trim() || !form.phone_number.trim() || !form.id_number.trim()) {
       showToast('Please fill all fields', 'error'); return;
     }
     setLoading(true);
     try {
       let id_image_url = null;
+
+      // Upload ID image if provided
       if (idFile) {
-        const ext = idFile.name.split('.').pop();
-        const path = `${form.id_number}.${ext}`;
-        const { error: uploadErr } = await supabase.storage.from('id-images').upload(path, idFile, { upsert: true });
-        if (!uploadErr) {
-          const { data: urlData } = supabase.storage.from('id-images').getPublicUrl(path);
-          id_image_url = urlData.publicUrl;
+        try {
+          const ext = idFile.name.split('.').pop();
+          const path = `${form.id_number.replace(/\//g, '-')}.${ext}`;
+          const { error: uploadErr } = await supabase.storage
+            .from('id-images')
+            .upload(path, idFile, { upsert: true });
+          if (!uploadErr) {
+            const { data: urlData } = supabase.storage.from('id-images').getPublicUrl(path);
+            id_image_url = urlData.publicUrl;
+          }
+        } catch (uploadEx) {
+          console.warn('ID upload failed, continuing without image:', uploadEx);
         }
       }
-      const { error } = await createCustomer({
-        ...form,
-        account_number: form.id_number,
-        id_image_url,
-        enrolled_by: profile.id,
-      });
-      if (error) throw error;
-      showToast(`Customer ${form.full_name} enrolled! Account: ${form.id_number}`);
+
+      const customerData = {
+        full_name: form.full_name.trim(),
+        phone_number: form.phone_number.trim(),
+        id_number: form.id_number.trim(),
+        account_number: form.id_number.trim(),
+        enrolled_by: profile?.id || null,
+      };
+      if (id_image_url) customerData.id_image_url = id_image_url;
+
+      const { data, error } = await createCustomer(customerData);
+
+      if (error) {
+        if (error.code === '23505') {
+          showToast('A customer with this ID number already exists', 'error');
+        } else {
+          showToast(error.message || 'Failed to enroll customer', 'error');
+        }
+        setLoading(false);
+        return;
+      }
+
+      showToast(`✓ ${form.full_name} enrolled! Account: ${form.id_number}`);
       setForm({ full_name: '', phone_number: '', id_number: '' });
-      setPreview(null); setIdFile(null);
-      refresh();
+      setPreview(null);
+      setIdFile(null);
+      await refresh();
       setActive('customers');
     } catch (e) {
-      showToast(e.message, 'error');
-    } finally {
-      setLoading(false);
+      console.error('Enroll error:', e);
+      showToast(e.message || 'Enrollment failed', 'error');
     }
+    setLoading(false);
   };
 
   return (
     <div>
-      <div className="vx-topbar">
-        <h1 className="vx-page-title" style={{ color: 'var(--accent-cyan)' }}>Enroll Customer</h1>
-      </div>
-      <div style={{ maxWidth: 580 }}>
-        <div className="vx-card">
-          <div className="vx-form-group">
-            <label className="vx-label">Full Name</label>
-            <input className="vx-input" placeholder="John Doe" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} />
-          </div>
-          <div className="vx-form-group">
-            <label className="vx-label">Phone Number</label>
-            <input className="vx-input" placeholder="+260 97X XXX XXX" value={form.phone_number} onChange={e => setForm({ ...form, phone_number: e.target.value })} />
-          </div>
-          <div className="vx-form-group">
-            <label className="vx-label">National ID Number (= Account Number)</label>
-            <input className="vx-input" placeholder="123456/78/9" value={form.id_number} onChange={e => setForm({ ...form, id_number: e.target.value })} />
-            {form.id_number && (
-              <div style={{ marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--accent-cyan)' }}>
-                Account # will be: <strong>{form.id_number}</strong>
-              </div>
+      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent-cyan)', letterSpacing: 2, marginBottom: '1.25rem' }}>Enroll Customer</h1>
+      <div className="vx-card">
+        <div className="vx-form-group">
+          <label className="vx-label">Full Name *</label>
+          <input className="vx-input" placeholder="John Banda" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} />
+        </div>
+        <div className="vx-form-group">
+          <label className="vx-label">Phone Number *</label>
+          <input className="vx-input" placeholder="+260 97X XXX XXX" type="tel" value={form.phone_number} onChange={e => setForm({ ...form, phone_number: e.target.value })} />
+        </div>
+        <div className="vx-form-group">
+          <label className="vx-label">National ID Number * (becomes Account Number)</label>
+          <input className="vx-input" placeholder="123456/78/9" value={form.id_number} onChange={e => setForm({ ...form, id_number: e.target.value })} />
+          {form.id_number && (
+            <div style={{ marginTop: 6, fontSize: '0.78rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+              Account #: <strong>{form.id_number}</strong>
+            </div>
+          )}
+        </div>
+        <div className="vx-form-group">
+          <label className="vx-label">ID Document / Photo (optional)</label>
+          <div onClick={() => fileRef.current.click()}
+            style={{ border: '2px dashed var(--border)', borderRadius: 8, padding: '1.25rem', textAlign: 'center', cursor: 'pointer', background: 'var(--bg-secondary)', minHeight: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 6 }}>
+            {preview ? (
+              <img src={preview} alt="ID" style={{ maxHeight: 120, borderRadius: 6, maxWidth: '100%' }} />
+            ) : (
+              <>
+                <div style={{ fontSize: '1.75rem' }}>📷</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Tap to upload ID photo</div>
+              </>
             )}
           </div>
-
-          {/* ID Upload */}
-          <div className="vx-form-group">
-            <label className="vx-label">Upload ID Document / Photo</label>
-            <div
-              onClick={() => fileRef.current.click()}
-              style={{
-                border: '2px dashed var(--border)', borderRadius: '8px', padding: '1.5rem',
-                textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.2s',
-                background: 'var(--bg-secondary)'
-              }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-cyan)'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-            >
-              {preview ? (
-                <img src={preview} alt="ID Preview" style={{ maxHeight: 160, borderRadius: 6, maxWidth: '100%' }} />
-              ) : (
-                <>
-                  <div style={{ fontSize: '2rem', marginBottom: 8 }}>📷</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Click to upload ID photo or document</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: 4 }}>JPG, PNG, PDF supported</div>
-                </>
-              )}
-            </div>
-            <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={handleFileChange} />
-          </div>
-
-          <button className="vx-btn vx-btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.8rem', fontSize: '0.95rem', letterSpacing: '2px' }} onClick={handleSubmit} disabled={loading}>
-            {loading ? 'ENROLLING...' : '⊕ ENROLL CUSTOMER'}
-          </button>
+          <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={handleFileChange} />
+          {idFile && <div style={{ marginTop: 4, fontSize: '0.75rem', color: 'var(--accent-green)' }}>✓ {idFile.name}</div>}
         </div>
+        <button
+          className="vx-btn vx-btn-primary"
+          style={{ width: '100%', justifyContent: 'center', padding: '0.875rem', fontSize: '0.95rem', letterSpacing: 2, marginTop: 4 }}
+          onClick={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+              <span className="vx-spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
+              ENROLLING...
+            </span>
+          ) : '⊕ ENROLL CUSTOMER'}
+        </button>
       </div>
     </div>
   );
 }
 
-// ─── Customers List ───────────────────────────────────────────────────────────
+// ── Customers List ────────────────────────────────────────────────────────────
 function CustomersList({ customers, showToast, profile }) {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
@@ -285,209 +312,136 @@ function CustomersList({ customers, showToast, profile }) {
 
   return (
     <div>
-      <div className="vx-topbar">
-        <h1 className="vx-page-title" style={{ color: 'var(--accent-cyan)' }}>Customers</h1>
-        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{customers.length} total</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent-cyan)', letterSpacing: 2 }}>Customers</h1>
+        <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{customers.length} total</span>
       </div>
-
-      <div style={{ marginBottom: '1rem' }}>
-        <input className="vx-input" placeholder="Search by name, account number, phone..." value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 400 }} />
+      <input className="vx-input" placeholder="Search name, account, phone..." value={search} onChange={e => setSearch(e.target.value)} style={{ marginBottom: '1rem' }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+        {filtered.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>No customers found</div>}
+        {filtered.map(c => {
+          const loan = c.loans?.[0];
+          return (
+            <div key={c.id} className="vx-card" style={{ padding: '1rem', cursor: 'pointer' }} onClick={() => setSelected(c)}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: 2 }}>{c.full_name}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>#{c.account_number}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>{c.phone_number}</div>
+                </div>
+                <span className={`vx-badge ${loan ? (loan.status === 'active' ? 'vx-badge-info' : 'vx-badge-success') : 'vx-badge-warning'}`}>
+                  {loan ? loan.status : 'No Loan'}
+                </span>
+              </div>
+              {loan && (
+                <div style={{ marginTop: '0.625rem' }}>
+                  <div className="vx-progress">
+                    <div className="vx-progress-bar" style={{ width: `${Math.min(100, (loan.total_paid / loan.device_price) * 100)}%` }} />
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 3 }}>
+                    K{loan.total_paid} paid · K{(loan.balance_due || 0).toFixed(0)} remaining
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-
-      <div className="vx-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="vx-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Account #</th>
-                <th>Phone</th>
-                <th>Device</th>
-                <th>Loan Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(c => {
-                const loan = c.loans?.[0];
-                const device = loan?.devices;
-                return (
-                  <tr key={c.id}>
-                    <td style={{ fontWeight: 600 }}>{c.full_name}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--accent-cyan)' }}>{c.account_number}</td>
-                    <td>{c.phone_number}</td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{device?.device_model || '—'}</td>
-                    <td>
-                      {loan ? (
-                        <span className={`vx-badge ${loan.status === 'active' ? 'vx-badge-info' : 'vx-badge-success'}`}>{loan.status}</span>
-                      ) : <span className="vx-badge vx-badge-warning">No Loan</span>}
-                    </td>
-                    <td>
-                      <button className="vx-btn vx-btn-secondary vx-btn-sm" onClick={() => setSelected(c)}>View</button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {selected && <CustomerDetailModal customer={selected} onClose={() => setSelected(null)} profile={profile} showToast={showToast} />}
+      {selected && <CustomerModal customer={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
 
-// ─── Customer Detail Modal ────────────────────────────────────────────────────
-function CustomerDetailModal({ customer, onClose, profile, showToast }) {
+function CustomerModal({ customer, onClose }) {
   const loan = customer.loans?.[0];
-  const device = loan?.devices;
   const pct = loan ? Math.min(100, (loan.total_paid / loan.device_price) * 100) : 0;
-
   return (
     <div className="vx-modal-overlay" onClick={onClose}>
       <div className="vx-modal" onClick={e => e.stopPropagation()}>
         <div className="vx-modal-title">◉ Customer Profile</div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-          <div>
-            <div className="vx-label">Full Name</div>
-            <div style={{ fontWeight: 600, fontSize: '1rem' }}>{customer.full_name}</div>
-          </div>
-          <div>
-            <div className="vx-label">Account Number</div>
-            <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: 700 }}>{customer.account_number}</div>
-          </div>
-          <div>
-            <div className="vx-label">Phone</div>
-            <div>{customer.phone_number}</div>
-          </div>
-          <div>
-            <div className="vx-label">National ID</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>{customer.id_number}</div>
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem', marginBottom: '1rem' }}>
+          <div><div className="vx-label">Name</div><div style={{ fontWeight: 600 }}>{customer.full_name}</div></div>
+          <div><div className="vx-label">Account #</div><div style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontSize: '0.85rem' }}>{customer.account_number}</div></div>
+          <div><div className="vx-label">Phone</div><div style={{ fontSize: '0.875rem' }}>{customer.phone_number}</div></div>
+          <div><div className="vx-label">National ID</div><div style={{ fontSize: '0.85rem', fontFamily: 'var(--font-mono)' }}>{customer.id_number}</div></div>
         </div>
-
-        {customer.id_image_url && (
-          <div style={{ marginBottom: '1.5rem' }}>
-            <div className="vx-label" style={{ marginBottom: 8 }}>ID Document</div>
-            <img src={customer.id_image_url} alt="ID" style={{ maxHeight: 120, borderRadius: 6, border: '1px solid var(--border)' }} />
-          </div>
-        )}
-
+        {customer.id_image_url && <img src={customer.id_image_url} alt="ID" style={{ maxHeight: 100, borderRadius: 6, marginBottom: '1rem', border: '1px solid var(--border)' }} />}
         {loan && (
-          <div style={{ background: 'var(--bg-secondary)', borderRadius: '8px', padding: '1rem', marginBottom: '1rem' }}>
-            <div className="vx-label" style={{ marginBottom: '0.75rem' }}>Loan Details</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <div><div className="vx-label">Device</div><div>{device?.device_model || device?.device_name || '—'}</div></div>
-              <div><div className="vx-label">Device Price</div><div>K{loan.device_price}</div></div>
-              <div><div className="vx-label">Daily Rate</div><div style={{ color: 'var(--accent-cyan)' }}>K{loan.daily_rate}/day</div></div>
-              <div><div className="vx-label">Balance Due</div><div style={{ color: loan.balance_due > 0 ? 'var(--accent-orange)' : 'var(--accent-green)' }}>K{(loan.balance_due || 0).toFixed(2)}</div></div>
+          <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '0.875rem', marginBottom: '1rem' }}>
+            <div className="vx-label" style={{ marginBottom: '0.75rem' }}>Loan</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem', fontSize: '0.85rem' }}>
+              <div><div className="vx-label" style={{ fontSize: '0.65rem' }}>Device</div><div>{loan.devices?.device_model || '—'}</div></div>
+              <div><div className="vx-label" style={{ fontSize: '0.65rem' }}>Price</div><div>K{loan.device_price}</div></div>
+              <div><div className="vx-label" style={{ fontSize: '0.65rem' }}>Daily</div><div style={{ color: 'var(--accent-cyan)' }}>K{loan.daily_rate}</div></div>
+              <div><div className="vx-label" style={{ fontSize: '0.65rem' }}>Balance</div><div style={{ color: 'var(--accent-orange)' }}>K{(loan.balance_due || 0).toFixed(2)}</div></div>
             </div>
-            <div className="vx-label">Payment Progress</div>
-            <div className="vx-progress" style={{ marginTop: 6 }}>
-              <div className="vx-progress-bar" style={{ width: `${pct}%`, background: pct >= 100 ? 'var(--accent-green)' : pct > 50 ? 'var(--accent-cyan)' : 'var(--accent-orange)' }} />
+            <div className="vx-progress">
+              <div className="vx-progress-bar" style={{ width: `${pct}%` }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              <span>Paid: K{loan.total_paid}</span>
-              <span>{pct.toFixed(1)}%</span>
-              <span>Total: K{loan.device_price}</span>
-            </div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 3 }}>{pct.toFixed(0)}% paid</div>
           </div>
         )}
-
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button className="vx-btn vx-btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose}>Close</button>
-          <a href={`/customer/${customer.account_number}`} target="_blank" rel="noreferrer" className="vx-btn vx-btn-primary" style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>
-            Customer View →
-          </a>
+          <a href={`/customer/${customer.account_number}`} target="_blank" rel="noreferrer" className="vx-btn vx-btn-primary" style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>View Portal</a>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Devices List ─────────────────────────────────────────────────────────────
+// ── Devices List ──────────────────────────────────────────────────────────────
 function DevicesList({ devices, refresh, showToast, profile }) {
   const [cmdLoading, setCmdLoading] = useState('');
-
   const sendCommand = async (device, cmd) => {
     setCmdLoading(device.id + cmd);
     try {
       await issueCommand(device.id, cmd, profile.id);
       await updateDevice(device.id, { is_locked: cmd === 'lock' });
-      showToast(`${cmd.toUpperCase()} command sent to ${device.device_name || device.device_imei}`);
+      showToast(`${cmd.toUpperCase()} command sent`);
       refresh();
-    } catch (e) {
-      showToast(e.message, 'error');
-    } finally {
-      setCmdLoading('');
-    }
+    } catch (e) { showToast(e.message, 'error'); }
+    setCmdLoading('');
   };
-
   return (
     <div>
-      <div className="vx-topbar">
-        <h1 className="vx-page-title" style={{ color: 'var(--accent-cyan)' }}>Device Fleet</h1>
-        <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{devices.length} devices</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent-cyan)', letterSpacing: 2 }}>Devices</h1>
+        <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{devices.length} total</span>
       </div>
-
-      <div className="vx-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="vx-table">
-            <thead>
-              <tr>
-                <th>Device</th>
-                <th>IMEI</th>
-                <th>Customer</th>
-                <th>Daily Rate</th>
-                <th>Enrolled</th>
-                <th>Lock State</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {devices.map(d => (
-                <tr key={d.id}>
-                  <td style={{ fontWeight: 600 }}>{d.device_name || d.device_model || '—'}</td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{d.device_imei}</td>
-                  <td>{d.customers?.full_name || <span style={{ color: 'var(--text-muted)' }}>Unassigned</span>}</td>
-                  <td>K{d.daily_rate}</td>
-                  <td>
-                    <span className={`vx-badge ${d.is_enrolled ? 'vx-badge-success' : 'vx-badge-warning'}`}>
-                      {d.is_enrolled ? 'Enrolled' : 'Pending'}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`vx-badge ${d.is_locked ? 'vx-badge-danger' : 'vx-badge-success'}`}>
-                      {d.is_locked ? '🔒 Locked' : '🔓 Unlocked'}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {!d.is_locked ? (
-                        <button className="vx-btn vx-btn-danger vx-btn-sm" disabled={cmdLoading === d.id + 'lock'} onClick={() => sendCommand(d, 'lock')}>
-                          Lock
-                        </button>
-                      ) : (
-                        <button className="vx-btn vx-btn-success vx-btn-sm" disabled={cmdLoading === d.id + 'unlock'} onClick={() => sendCommand(d, 'unlock')}>
-                          Unlock
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+        {devices.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>No devices enrolled yet</div>}
+        {devices.map(d => (
+          <div key={d.id} className="vx-card" style={{ padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.625rem' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{d.device_name || d.device_model || 'Unknown Device'}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{d.device_imei}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>{d.customers?.full_name || 'Unassigned'} · K{d.daily_rate}/day</div>
+              </div>
+              <span className={`vx-badge ${d.is_locked ? 'vx-badge-danger' : 'vx-badge-success'}`}>
+                {d.is_locked ? '🔒 Locked' : '🔓 Active'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <span className={`vx-badge ${d.is_enrolled ? 'vx-badge-success' : 'vx-badge-warning'}`} style={{ fontSize: '0.65rem' }}>
+                {d.is_enrolled ? 'Enrolled' : 'Pending'}
+              </span>
+              {!d.is_locked ? (
+                <button className="vx-btn vx-btn-danger vx-btn-sm" disabled={cmdLoading === d.id + 'lock'} onClick={() => sendCommand(d, 'lock')}>Lock</button>
+              ) : (
+                <button className="vx-btn vx-btn-success vx-btn-sm" disabled={cmdLoading === d.id + 'unlock'} onClick={() => sendCommand(d, 'unlock')}>Unlock</button>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-// ─── Link Device to Customer (Enrollment) ────────────────────────────────────
-function LinkDeviceToCustomer({ customers, devices, refresh, showToast, profile }) {
+// ── Link Device ───────────────────────────────────────────────────────────────
+function LinkDevice({ customers, refresh, showToast, profile }) {
   const [step, setStep] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [form, setForm] = useState({ device_imei: '', device_name: '', device_model: '', device_price: '', daily_rate: '' });
@@ -500,33 +454,32 @@ function LinkDeviceToCustomer({ customers, devices, refresh, showToast, profile 
     }
     setLoading(true);
     try {
-      // Create device
       const { data: device, error: devErr } = await createDevice({
-        ...form,
+        device_imei: form.device_imei.trim(),
+        device_name: form.device_name.trim(),
+        device_model: form.device_model.trim(),
         daily_rate: parseFloat(form.daily_rate),
         customer_id: selectedCustomer,
         enrolled_by: profile.id,
         is_enrolled: false,
       });
-      if (devErr) throw devErr;
+      if (devErr) throw new Error(devErr.message);
 
-      // Create loan
       const { error: loanErr } = await createLoan({
         customer_id: selectedCustomer,
         device_id: device.id,
         device_price: parseFloat(form.device_price),
         daily_rate: parseFloat(form.daily_rate),
       });
-      if (loanErr) throw loanErr;
+      if (loanErr) throw new Error(loanErr.message);
 
-      // Create enrollment token
       const { data: token, error: tokErr } = await createEnrollmentToken({
         device_id: device.id,
         customer_id: selectedCustomer,
         daily_rate: parseFloat(form.daily_rate),
         created_by: profile.id,
       });
-      if (tokErr) throw tokErr;
+      if (tokErr) throw new Error(tokErr.message);
 
       const customer = customers.find(c => c.id === selectedCustomer);
       setTokenResult({ token: token.token, device, customer });
@@ -534,192 +487,135 @@ function LinkDeviceToCustomer({ customers, devices, refresh, showToast, profile 
       refresh();
     } catch (e) {
       showToast(e.message, 'error');
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   return (
     <div>
-      <div className="vx-topbar">
-        <h1 className="vx-page-title" style={{ color: 'var(--accent-cyan)' }}>Link Device to Customer</h1>
-      </div>
-
-      {/* Steps */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-        {['Select Customer', 'Device Details', 'Enrollment QR'].map((s, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: step > i + 1 ? 'var(--accent-green)' : step === i + 1 ? 'var(--accent-cyan)' : 'var(--border)',
-              color: step >= i + 1 ? 'var(--bg-primary)' : 'var(--text-muted)',
-              fontWeight: 700, fontSize: '0.8rem'
-            }}>{i + 1}</div>
-            <span style={{ fontSize: '0.875rem', color: step === i + 1 ? 'var(--text-primary)' : 'var(--text-muted)' }}>{s}</span>
-            {i < 2 && <div style={{ width: 24, height: 1, background: 'var(--border)', margin: '0 4px' }} />}
+      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent-cyan)', letterSpacing: 2, marginBottom: '1rem' }}>Link Device</h1>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+        {['Customer', 'Device', 'Token'].map((s, i) => (
+          <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', margin: '0 auto 4px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: step > i + 1 ? 'var(--accent-green)' : step === i + 1 ? 'var(--accent-cyan)' : 'var(--border)', color: step >= i + 1 ? 'var(--bg-primary)' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.8rem' }}>{i + 1}</div>
+            <div style={{ fontSize: '0.65rem', color: step === i + 1 ? 'var(--text-primary)' : 'var(--text-muted)' }}>{s}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ maxWidth: 560 }}>
-        {step === 1 && (
-          <div className="vx-card">
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 600, letterSpacing: '2px', color: 'var(--text-secondary)', marginBottom: '1rem', textTransform: 'uppercase' }}>
-              Step 1: Select Customer
+      {step === 1 && (
+        <div className="vx-card">
+          <div className="vx-form-group">
+            <label className="vx-label">Select Customer</label>
+            <select className="vx-select" value={selectedCustomer} onChange={e => setSelectedCustomer(e.target.value)}>
+              <option value="">-- Choose customer --</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.full_name} ({c.account_number})</option>)}
+            </select>
+          </div>
+          <button className="vx-btn vx-btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={!selectedCustomer} onClick={() => setStep(2)}>Next →</button>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="vx-card">
+          {[
+            { key: 'device_imei', label: 'Device IMEI *', placeholder: '35XXXXXXXXXXXX', type: 'text' },
+            { key: 'device_name', label: 'Device Name *', placeholder: 'Samsung Galaxy A15', type: 'text' },
+            { key: 'device_model', label: 'Model Number', placeholder: 'SM-A155F', type: 'text' },
+            { key: 'device_price', label: 'Total Price (K) *', placeholder: '2500', type: 'number' },
+            { key: 'daily_rate', label: 'Daily Payment (K) *', placeholder: '25', type: 'number' },
+          ].map(f => (
+            <div className="vx-form-group" key={f.key}>
+              <label className="vx-label">{f.label}</label>
+              <input className="vx-input" type={f.type} placeholder={f.placeholder} value={form[f.key]} onChange={e => setForm({ ...form, [f.key]: e.target.value })} />
             </div>
-            <div className="vx-form-group">
-              <label className="vx-label">Customer</label>
-              <select className="vx-select" value={selectedCustomer} onChange={e => setSelectedCustomer(e.target.value)}>
-                <option value="">-- Choose customer --</option>
-                {customers.map(c => (
-                  <option key={c.id} value={c.id}>{c.full_name} ({c.account_number})</option>
-                ))}
-              </select>
+          ))}
+          {form.device_price && form.daily_rate && (
+            <div className="vx-alert vx-alert-info" style={{ marginBottom: '1rem', fontSize: '0.82rem' }}>
+              ~{Math.ceil(parseFloat(form.device_price) / parseFloat(form.daily_rate))} days · K{form.daily_rate}/day
             </div>
-            <button className="vx-btn vx-btn-primary" disabled={!selectedCustomer} onClick={() => setStep(2)} style={{ width: '100%', justifyContent: 'center' }}>
-              Next →
+          )}
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button className="vx-btn vx-btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setStep(1)}>← Back</button>
+            <button className="vx-btn vx-btn-primary" style={{ flex: 2, justifyContent: 'center' }} onClick={handleGenerate} disabled={loading}>
+              {loading ? 'Generating...' : 'Generate Token →'}
             </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {step === 2 && (
-          <div className="vx-card">
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 600, letterSpacing: '2px', color: 'var(--text-secondary)', marginBottom: '1rem', textTransform: 'uppercase' }}>
-              Step 2: Device Information
-            </div>
-            {[
-              { key: 'device_imei', label: 'Device IMEI', placeholder: '35XXXXXXXXXXXX' },
-              { key: 'device_name', label: 'Device Name', placeholder: 'e.g. Samsung Galaxy A15' },
-              { key: 'device_model', label: 'Device Model', placeholder: 'e.g. SM-A155F' },
-              { key: 'device_price', label: 'Total Device Price (K)', placeholder: '2500.00' },
-              { key: 'daily_rate', label: 'Daily Payment Amount (K)', placeholder: '25.00' },
-            ].map(f => (
-              <div className="vx-form-group" key={f.key}>
-                <label className="vx-label">{f.label}</label>
-                <input className="vx-input" placeholder={f.placeholder} value={form[f.key]} onChange={e => setForm({ ...form, [f.key]: e.target.value })} />
-              </div>
-            ))}
-            {form.device_price && form.daily_rate && (
-              <div className="vx-alert vx-alert-info">
-                📊 Est. {Math.ceil(form.device_price / form.daily_rate)} days to complete · K{form.daily_rate}/day
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button className="vx-btn vx-btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setStep(1)}>← Back</button>
-              <button className="vx-btn vx-btn-primary" style={{ flex: 2, justifyContent: 'center' }} onClick={handleGenerate} disabled={loading}>
-                {loading ? 'Generating...' : '⊞ Generate Enrollment Token →'}
-              </button>
-            </div>
+      {step === 3 && tokenResult && (
+        <div className="vx-card">
+          <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>✅</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-green)' }}>Enrollment Ready!</div>
+            <div style={{ color: 'var(--text-secondary)', marginTop: 4, fontSize: '0.82rem' }}>{tokenResult.customer?.full_name} · {tokenResult.device?.device_name}</div>
           </div>
-        )}
-
-        {step === 3 && tokenResult && (
-          <div className="vx-card">
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <div style={{ fontSize: '3rem', marginBottom: 8 }}>✅</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 700, color: 'var(--accent-green)' }}>
-                Enrollment Ready!
-              </div>
-              <div style={{ color: 'var(--text-secondary)', marginTop: 6, fontSize: '0.875rem' }}>
-                Customer: <strong>{tokenResult.customer?.full_name}</strong> · Device: {tokenResult.device?.device_name}
-              </div>
+          <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '1rem', marginBottom: '1rem' }}>
+            <div className="vx-label" style={{ marginBottom: 6 }}>Enrollment Token</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--accent-cyan)', wordBreak: 'break-all', background: 'var(--bg-primary)', borderRadius: 6, padding: '0.75rem', border: '1px solid var(--border-bright)', letterSpacing: 1 }}>
+              {tokenResult.token}
             </div>
-
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: '8px', padding: '1.25rem', marginBottom: '1.5rem' }}>
-              <div className="vx-label" style={{ marginBottom: 8 }}>Android Enrollment Token</div>
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: '0.9rem', color: 'var(--accent-cyan)',
-                wordBreak: 'break-all', background: 'var(--bg-primary)', borderRadius: 6,
-                padding: '0.75rem 1rem', border: '1px solid var(--border-bright)', letterSpacing: 1
-              }}>
-                {tokenResult.token}
-              </div>
-              <button className="vx-btn vx-btn-secondary vx-btn-sm" style={{ marginTop: 8 }} onClick={() => { navigator.clipboard.writeText(tokenResult.token); showToast('Token copied!'); }}>
-                Copy Token
-              </button>
-            </div>
-
-            <div className="vx-alert vx-alert-info" style={{ fontSize: '0.85rem' }}>
-              <div>
-                <strong>Android Enrollment Steps:</strong>
-                <ol style={{ marginTop: 8, paddingLeft: 16, lineHeight: 2 }}>
-                  <li>Factory reset the device</li>
-                  <li>On setup, tap the screen 6 times to trigger DPC enrollment</li>
-                  <li>Scan the QR code or enter the token above</li>
-                  <li>Vertex Go Device Admin app will auto-install</li>
-                  <li>Log in with customer account: <strong>{tokenResult.customer?.account_number}</strong></li>
-                </ol>
-              </div>
-            </div>
-
-            <button className="vx-btn vx-btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { setStep(1); setSelectedCustomer(''); setForm({ device_imei: '', device_name: '', device_model: '', device_price: '', daily_rate: '' }); setTokenResult(null); }}>
-              Enroll Another Device
+            <button className="vx-btn vx-btn-secondary vx-btn-sm" style={{ marginTop: 8 }} onClick={() => { navigator.clipboard.writeText(tokenResult.token); showToast('Token copied!'); }}>
+              Copy Token
             </button>
           </div>
-        )}
-      </div>
+          <div className="vx-alert vx-alert-info" style={{ fontSize: '0.8rem', marginBottom: '1rem', lineHeight: 1.7 }}>
+            <strong>Enrollment Steps:</strong><br />
+            1. Factory reset the phone<br />
+            2. Tap screen 6x on welcome screen<br />
+            3. Enter token above<br />
+            4. Vertex Go installs as Device Owner<br />
+            5. Log in with account: <strong>{tokenResult.customer?.account_number}</strong>
+          </div>
+          <button className="vx-btn vx-btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { setStep(1); setSelectedCustomer(''); setForm({ device_imei: '', device_name: '', device_model: '', device_price: '', daily_rate: '' }); setTokenResult(null); }}>
+            Enroll Another
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Loans List ───────────────────────────────────────────────────────────────
-function LoansList({ loans, refresh, showToast, profile }) {
+// ── Loans List ────────────────────────────────────────────────────────────────
+function LoansList({ loans }) {
   return (
     <div>
-      <div className="vx-topbar">
-        <h1 className="vx-page-title" style={{ color: 'var(--accent-cyan)' }}>Active Loans</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent-cyan)', letterSpacing: 2 }}>Loans</h1>
+        <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{loans.length} total</span>
       </div>
-      <div className="vx-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="vx-table">
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th>Device</th>
-                <th>Price</th>
-                <th>Daily</th>
-                <th>Paid</th>
-                <th>Balance</th>
-                <th>Progress</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loans.map(loan => {
-                const pct = Math.min(100, (loan.total_paid / loan.device_price) * 100);
-                return (
-                  <tr key={loan.id}>
-                    <td style={{ fontWeight: 600 }}>{loan.customers?.full_name}</td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{loan.devices?.device_model || '—'}</td>
-                    <td>K{loan.device_price}</td>
-                    <td style={{ color: 'var(--accent-cyan)' }}>K{loan.daily_rate}</td>
-                    <td style={{ color: 'var(--accent-green)' }}>K{loan.total_paid}</td>
-                    <td style={{ color: loan.balance_due > 0 ? 'var(--accent-orange)' : 'var(--accent-green)', fontWeight: 600 }}>
-                      K{(loan.balance_due || 0).toFixed(2)}
-                    </td>
-                    <td style={{ minWidth: 120 }}>
-                      <div className="vx-progress">
-                        <div className="vx-progress-bar" style={{ width: `${pct}%`, background: pct >= 100 ? 'var(--accent-green)' : pct > 50 ? 'var(--accent-cyan)' : 'var(--accent-orange)' }} />
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>{pct.toFixed(0)}%</div>
-                    </td>
-                    <td>
-                      <span className={`vx-badge ${loan.status === 'active' ? 'vx-badge-info' : loan.status === 'completed' ? 'vx-badge-success' : 'vx-badge-danger'}`}>
-                        {loan.status}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+        {loans.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>No loans yet</div>}
+        {loans.map(loan => {
+          const pct = Math.min(100, (loan.total_paid / loan.device_price) * 100);
+          return (
+            <div key={loan.id} className="vx-card" style={{ padding: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{loan.customers?.full_name}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{loan.devices?.device_model || '—'}</div>
+                </div>
+                <span className={`vx-badge ${loan.status === 'active' ? 'vx-badge-info' : loan.status === 'completed' ? 'vx-badge-success' : 'vx-badge-danger'}`}>{loan.status}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '0.5rem', marginBottom: '0.625rem', fontSize: '0.8rem' }}>
+                <div><div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>PRICE</div><div>K{loan.device_price}</div></div>
+                <div><div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>PAID</div><div style={{ color: 'var(--accent-green)' }}>K{loan.total_paid}</div></div>
+                <div><div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>BALANCE</div><div style={{ color: 'var(--accent-orange)', fontWeight: 700 }}>K{(loan.balance_due || 0).toFixed(0)}</div></div>
+              </div>
+              <div className="vx-progress">
+                <div className="vx-progress-bar" style={{ width: `${pct}%`, background: pct >= 100 ? 'var(--accent-green)' : pct > 50 ? 'var(--accent-cyan)' : 'var(--accent-orange)' }} />
+              </div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 3 }}>{pct.toFixed(0)}% · K{loan.daily_rate}/day</div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-// ─── Record Payment ───────────────────────────────────────────────────────────
+// ── Record Payment ────────────────────────────────────────────────────────────
 function RecordPayment({ loans, refresh, showToast, profile }) {
   const [selectedLoan, setSelectedLoan] = useState('');
   const [amount, setAmount] = useState('');
@@ -748,93 +644,66 @@ function RecordPayment({ loans, refresh, showToast, profile }) {
         notes,
       });
       if (error) throw error;
-      showToast(`Payment of K${amount} recorded. Device unlocked!`);
+      showToast(`✓ K${amount} recorded — device unlocked!`);
       setAmount(''); setNotes('');
       refresh();
       const { data } = await getPayments(selectedLoan);
       setPayments(data || []);
-    } catch (e) {
-      showToast(e.message, 'error');
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { showToast(e.message, 'error'); }
+    setLoading(false);
   };
 
   return (
     <div>
-      <div className="vx-topbar">
-        <h1 className="vx-page-title" style={{ color: 'var(--accent-cyan)' }}>Record Payment</h1>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', maxWidth: 900 }}>
-        <div>
-          <div className="vx-card">
-            <div className="vx-form-group">
-              <label className="vx-label">Select Loan / Customer</label>
-              <select className="vx-select" value={selectedLoan} onChange={e => setSelectedLoan(e.target.value)}>
-                <option value="">-- Choose loan --</option>
-                {activeLoans.map(l => (
-                  <option key={l.id} value={l.id}>{l.customers?.full_name} · Balance: K{(l.balance_due || 0).toFixed(2)}</option>
-                ))}
-              </select>
-            </div>
-
-            {loan && (
-              <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '0.875rem', marginBottom: '1rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.85rem' }}>
-                  <div><div className="vx-label" style={{ marginBottom: 2 }}>Daily Rate</div><div style={{ color: 'var(--accent-cyan)' }}>K{loan.daily_rate}</div></div>
-                  <div><div className="vx-label" style={{ marginBottom: 2 }}>Balance Due</div><div style={{ color: 'var(--accent-orange)' }}>K{(loan.balance_due || 0).toFixed(2)}</div></div>
-                </div>
-              </div>
-            )}
-
-            <div className="vx-form-group">
-              <label className="vx-label">Payment Amount (K)</label>
-              <input className="vx-input" type="number" placeholder="25.00" value={amount} onChange={e => setAmount(e.target.value)} />
-              {loan && (
-                <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                  {[loan.daily_rate, loan.daily_rate * 7, loan.daily_rate * 30].map(a => (
-                    <button key={a} className="vx-btn vx-btn-secondary vx-btn-sm" onClick={() => setAmount(a.toFixed(2))}>K{a.toFixed(0)}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="vx-form-group">
-              <label className="vx-label">Notes (optional)</label>
-              <input className="vx-input" placeholder="Mobile money ref, cash, etc." value={notes} onChange={e => setNotes(e.target.value)} />
-            </div>
-
-            <button className="vx-btn vx-btn-success" style={{ width: '100%', justifyContent: 'center', padding: '0.8rem', fontSize: '0.95rem', letterSpacing: '1px' }} onClick={handlePay} disabled={loading || !selectedLoan || !amount}>
-              {loading ? 'Processing...' : '✦ Record Payment & Unlock Device'}
-            </button>
-          </div>
+      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent-cyan)', letterSpacing: 2, marginBottom: '1rem' }}>Record Payment</h1>
+      <div className="vx-card" style={{ marginBottom: '1rem' }}>
+        <div className="vx-form-group">
+          <label className="vx-label">Select Customer / Loan</label>
+          <select className="vx-select" value={selectedLoan} onChange={e => setSelectedLoan(e.target.value)}>
+            <option value="">-- Choose loan --</option>
+            {activeLoans.map(l => <option key={l.id} value={l.id}>{l.customers?.full_name} — Balance: K{(l.balance_due || 0).toFixed(0)}</option>)}
+          </select>
         </div>
-
-        {selectedLoan && (
-          <div>
-            <div className="vx-card">
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.9rem', fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                Payment History
-              </div>
-              {payments.length === 0 ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No payments yet</div>
-              ) : (
-                payments.map(p => (
-                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.875rem' }}>
-                    <div>
-                      <div style={{ color: 'var(--accent-green)', fontWeight: 600 }}>K{p.amount}</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{p.notes || 'Payment'}</div>
-                    </div>
-                    <div style={{ textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                      {new Date(p.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+        {loan && (
+          <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '0.75rem', marginBottom: '0.875rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.85rem' }}>
+            <div><div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>DAILY RATE</div><div style={{ color: 'var(--accent-cyan)', fontWeight: 700 }}>K{loan.daily_rate}</div></div>
+            <div><div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>BALANCE DUE</div><div style={{ color: 'var(--accent-orange)', fontWeight: 700 }}>K{(loan.balance_due || 0).toFixed(2)}</div></div>
           </div>
         )}
+        <div className="vx-form-group">
+          <label className="vx-label">Amount (K)</label>
+          <input className="vx-input" type="number" placeholder="Enter amount" value={amount} onChange={e => setAmount(e.target.value)} />
+          {loan && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+              {[loan.daily_rate, loan.daily_rate * 7, loan.daily_rate * 30].map(a => (
+                <button key={a} className="vx-btn vx-btn-secondary vx-btn-sm" onClick={() => setAmount(a.toFixed(2))}>K{a.toFixed(0)}</button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="vx-form-group">
+          <label className="vx-label">Notes (optional)</label>
+          <input className="vx-input" placeholder="Mobile money ref, cash..." value={notes} onChange={e => setNotes(e.target.value)} />
+        </div>
+        <button className="vx-btn vx-btn-success" style={{ width: '100%', justifyContent: 'center', padding: '0.875rem', fontSize: '0.9rem' }} onClick={handlePay} disabled={loading || !selectedLoan || !amount}>
+          {loading ? 'Processing...' : '✦ Record & Unlock Device'}
+        </button>
       </div>
+
+      {selectedLoan && payments.length > 0 && (
+        <div className="vx-card">
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.8rem', fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.875rem' }}>Payment History</div>
+          {payments.map(p => (
+            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>
+              <div>
+                <div style={{ color: 'var(--accent-green)', fontWeight: 600 }}>K{p.amount}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{p.notes || 'Payment'}</div>
+              </div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{new Date(p.created_at).toLocaleDateString()}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
