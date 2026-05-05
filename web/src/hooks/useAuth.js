@@ -8,76 +8,74 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-      if (error) { console.error('Profile error:', error); return null; }
-      return data;
-    } catch (e) {
-      console.error('Profile exception:', e);
-      return null;
-    }
-  };
-
   useEffect(() => {
-    let mounted = true;
+    // First: read from localStorage instantly — no network call needed
+    const role = localStorage.getItem('vx_role');
+    const userId = localStorage.getItem('vx_user_id');
+    const email = localStorage.getItem('vx_email');
 
-    const init = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!mounted) return;
-        if (session?.user) {
-          setUser(session.user);
-          const p = await fetchProfile(session.user.id);
-          if (mounted) setProfile(p);
+    if (role && userId && email) {
+      // We have cached credentials — use them immediately
+      setUser({ id: userId, email });
+      setProfile({ id: userId, email, role, is_active: true, full_name: email.split('@')[0] });
+      setLoading(false);
+
+      // Verify session is still valid in background
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) {
+          // Session expired — clear and redirect to login
+          localStorage.removeItem('vx_role');
+          localStorage.removeItem('vx_user_id');
+          localStorage.removeItem('vx_email');
+          window.location.replace('/login');
         }
-      } catch (e) {
-        console.error('Init error:', e);
-      } finally {
-        // ALWAYS set loading false — even on error
-        if (mounted) setLoading(false);
-      }
-    };
+      });
+      return;
+    }
 
-    // Safety timeout — never stay loading more than 5 seconds
-    const timeout = setTimeout(() => {
-      if (mounted) setLoading(false);
-    }, 5000);
-
-    init().then(() => clearTimeout(timeout));
-
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
-        return;
-      }
+    // No cached credentials — check Supabase session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
-        const p = await fetchProfile(session.user.id);
-        if (mounted) { setProfile(p); setLoading(false); }
+        try {
+          const { data: p } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          if (p) {
+            setProfile(p);
+            localStorage.setItem('vx_role', p.role);
+            localStorage.setItem('vx_user_id', session.user.id);
+            localStorage.setItem('vx_email', session.user.email);
+          }
+        } catch (e) { console.error(e); }
       } else {
-        setUser(null);
-        setProfile(null);
-        if (mounted) setLoading(false);
+        // No session — redirect to login
+        window.location.replace('/login');
       }
+      setLoading(false);
+    }).catch(() => {
+      setLoading(false);
+      window.location.replace('/login');
     });
 
-    return () => {
-      mounted = false;
-      clearTimeout(timeout);
-      listener.subscription.unsubscribe();
-    };
+    // Safety timeout
+    const t = setTimeout(() => setLoading(false), 5000);
+    return () => clearTimeout(t);
   }, []);
 
+  const signOut = async () => {
+    localStorage.removeItem('vx_role');
+    localStorage.removeItem('vx_user_id');
+    localStorage.removeItem('vx_email');
+    localStorage.removeItem('sb-tonlofhigkpbcsmfesjq-auth-token');
+    await supabase.auth.signOut();
+    window.location.replace('/login');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );
